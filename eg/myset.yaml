@@ -1,10 +1,22 @@
 run:
-  ilab: 1234
-  libtype: 'scRNAseq'
-  nsamples: 4
-  seqtype: 'PE'
-  readlen: [28,91]
+  iLab: 1234
+  libType: 'scRNAseq'
+  nSamples: 4
+  instrument: 'NovaSeq6000'
+  seqType: 'PE'
+  readLen: [28,91]
+  date: '2021_06_23'
+user:
+  name: 'Adrian'
+  email: 'yit2001@med.cornell.edu'
+  piEmail: 'yit2001@med.cornell.edu'
+  dataPath: '/gc-data/data/Apostolu/Apostolou-DG-10757_2021_06_16'
+core:
+  name: 'Adrian'
+  fromEmail: 'yit2001@med.cornell.edu'
+  ccEmails:
+    - 'taz2008@med.cornell.edu'
 attachments:
-  demuxsum:
+  demuxSum:
     - '/data/gc-core/taz2008/Pipelines/Toolkits/GRCF_daily_work/eg/lane.html'
     - '/data/gc-core/taz2008/Pipelines/Toolkits/GRCF_daily_work/eg/laneBarcode.html'
