@@ -60,7 +60,7 @@ def prepare_email(setting_file):
 	sender = setdic['core']['name']
 	# create email message
 	msg = EmailMessage()
-	msg['Subject'] = '{} {} {} {} sequencing data'.format(instrument,seqtype,date,libtype)
+	msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
 	msg['To'] = ', '.join(e_tos)
 	msg['Cc'] = ', '.join(e_ccs)
 	msg['From'] = e_from
