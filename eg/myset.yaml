@@ -1,0 +1,10 @@
+run:
+  ilab: 1234
+  libtype: 'scRNAseq'
+  nsamples: 4
+  seqtype: 'PE'
+  readlen: [28,91]
+attachments:
+  demuxsum:
+    - '/data/gc-core/taz2008/Pipelines/Toolkits/GRCF_daily_work/eg/lane.html'
+    - '/data/gc-core/taz2008/Pipelines/Toolkits/GRCF_daily_work/eg/laneBarcode.html'
