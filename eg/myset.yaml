@@ -15,6 +15,7 @@ core:
   name: 'Adrian'
   fromEmail: 'yit2001@med.cornell.edu'
   ccEmails:
+    - 'yit2001@med.cornell.edu'
     - 'taz2008@med.cornell.edu'
 attachments:
   demuxSum:
