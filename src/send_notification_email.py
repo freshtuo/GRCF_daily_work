@@ -19,40 +19,57 @@ from time import localtime
 from time import asctime
 from email.message import EmailMessage
 from argparse import ArgumentParser
+from argparse import ArgumentDefaultsHelpFormatter
 
-# functions
-# get current time
-def get_time():
-	return '['+asctime(localtime(time()))+']'
+# class
+class MyEmail:
+    """Class for sending notification email"""
 
-# extract information out of the setting yaml file
-def parse_settings(setting_file):
-	# read in setting info
-	with open(setting_file, 'r') as fset:
-		setdic = yaml.safe_load(fset)
-	# check existence of attachments
-	if setdic['attachments'] == None:
-		print('No attachments detected')
-	else:
-		for sum_file in setdic['attachments']['demuxSum']:
-			if not exists(sum_file):
-				print('Error: Cannot locate demux summary file {}!'.format(sum_file))
-				sys.exit(1)
-	return(setdic) 
+    def __init__(self, args):
+        """class constructor"""
+        # dictionary saving email settings
+        self.setdic = {}
+        # email main text
+        self.main_text = ''
+        # complete email message
+        self.msg = EmailMessage()
+        # commandline arguments
+        self.args = args
 
-# prepare email main text based on data location
-def prepare_content(setdic, location):
-	content = ''
-	if location == 'sftp':
-		# collect info
-		instrument = setdic['run']['instrument']
-		ilab = setdic['run']['iLab']
-		nsamples = setdic['run']['nSamples']
-		dataloc = setdic['user']['dataPath']
-		username = setdic['user']['name']
-		sender = setdic['core']['name']
-		# update text
-		content = """\
+    def get_time(self):
+        """get current time"""
+        return '['+asctime(localtime(time()))+']'
+
+    def initialize_settings(self):
+        """load settings from a yaml file"""
+        setting_file = self.args.setting
+        # read from setting yaml if exists
+        if exists(setting_file):
+            with open(setting_file, 'r') as fset:
+                self.setdic = yaml.safe_load(fset)
+        else:
+            # initialize settings
+            # 'run' section: sequencing run info
+            self.setdic['run'] = {'iLab':-1, 'libType':'', 'nSamples':0, 'instrument':'', 'seqType':'', 'readLen':[], 'date':''}
+            # 'user' section: user contact info
+            self.setdic['user'] = {'name':'', 'email':'', 'piEmail':'', 'dataPath':''}
+            # 'core' section: core contact info
+            self.setdic['core'] = {'name':'Adrian', 'fromEmail':'yit2001@med.cornell.edu', 'ccEmails':['yit2001@med.cornell.edu', 'taz2008@med.cornell.edu']}
+            # 'attachments' section: files to attach
+            self.setdic['attachments'] = {'demuxSum':[], 'other':[]}
+
+    def prepare_main_text(self):
+        """prepare email main text"""
+        # collect info
+        instrument = self.setdic['run']['instrument']
+        ilab = self.setdic['run']['iLab']
+        nsamples = self.setdic['run']['nSamples']
+        dataloc = self.setdic['user']['dataPath']
+        username = self.setdic['user']['name']
+        sender = self.setdic['core']['name']
+        # update main text
+        if self.args.location == 'sftp':
+            self.main_text = """\
 <html>
   <head></head>
   <body>
@@ -75,16 +92,8 @@ def prepare_content(setdic, location):
   </body>
 </html>
 """.format(username,instrument,nsamples,ilab,dataloc,sender)
-	elif location == 'aws':
-		# collect info
-		instrument = setdic['run']['instrument']
-		ilab = setdic['run']['iLab']
-		nsamples = setdic['run']['nSamples']
-		dataloc = setdic['user']['dataPath']
-		username = setdic['user']['name']
-		sender = setdic['core']['name']
-		# update text
-		content = """\
+        elif self.args.location == 'aws':
+            self.main_text = """\
 <html>
   <head></head>
   <body>
@@ -102,57 +111,76 @@ def prepare_content(setdic, location):
   </body>
 </html>
 """.format(username,instrument,nsamples,ilab,dataloc,sender)
-	return content
 
-def prepare_email(setting_file, location):
-	# parse settings
-	setdic = parse_settings(setting_file)
-	# collect info
-	instrument = setdic['run']['instrument']
-	date = setdic['run']['date']
-	libtype = setdic['run']['libType']
-	seqtype = setdic['run']['seqType']
-	readlen = '+'.join(['{}'.format(x) for x in setdic['run']['readLen']])
-	demuxsum = []
-	if setdic['attachments'] is not None:
-		demuxsum = setdic['attachments']['demuxSum']
-	e_tos = [setdic['user']['email'], setdic['user']['piEmail']]
-	e_ccs = setdic['core']['ccEmails']
-	e_from = setdic['core']['fromEmail']
-	# create email message
-	msg = EmailMessage()
-	msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
-	msg['To'] = ', '.join(e_tos)
-	msg['Cc'] = ', '.join(e_ccs)
-	msg['From'] = e_from
-	# email content
-	content = prepare_content(setdic, location)
-	msg.set_content(content, subtype='html')
-	# add demux summary if exists
-	for dfile in demuxsum:
-		ctype, encoding = mimetypes.guess_type(dfile)
-		if ctype is None or encoding is not None:
-			# No guess could be made, or the file is encoded (compressed), so
-			# use a generic bag-of-bits type.
-			ctype = 'application/octet-stream'
-		maintype, subtype = ctype.split('/', 1)
-		with open(dfile, 'rb') as fp:
-			msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=basename(dfile))
-	return msg
+    def prepare_email(self):
+        # collect info
+        instrument = self.setdic['run']['instrument']
+        date = self.setdic['run']['date']
+        libtype = self.setdic['run']['libType']
+        seqtype = self.setdic['run']['seqType']
+        readlen = '+'.join(['{}'.format(x) for x in self.setdic['run']['readLen']])
+        e_tos = [self.setdic['user']['email'], self.setdic['user']['piEmail']]
+        e_ccs = self.setdic['core']['ccEmails']
+        e_from = self.setdic['core']['fromEmail']
+        # demultiplex summary files
+        demuxsum = []
+        if 'demuxsum' in self.setdic['attachments']:
+            for sum_file in self.setdic['attachments']['demuxSum']:
+             # file exists?
+             if exists(sum_file):
+                 demuxsum.append(sum_file)
+        # other files
+        other = []
+        if 'other' in self.setdic['attachments']:
+            for other_file in self.setdic['attachments']['other']:
+             # file exists?
+             if exists(other_file):
+                 other.append(other_file)
+        # create email message
+        self.msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
+        self.msg['To'] = ', '.join(e_tos)
+        self.msg['Cc'] = ', '.join(e_ccs)
+        self.msg['From'] = e_from
+        # email content
+        self.msg.set_content(self.main_text, subtype='html')
+        # add attachments (demux summary & other files)
+        for dfile in demuxsum+other:
+            ctype, encoding = mimetypes.guess_type(dfile)
+            if ctype is None or encoding is not None:
+                # No guess could be made, or the file is encoded (compressed),
+                # so use a generic bag-of-bits type.
+                ctype = 'application/octet-stream'
+            maintype, subtype = ctype.split('/', 1)
+            with open(dfile, 'rb') as fp:
+                self.msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=basename(dfile))
 
-def send_email(setting_file, location):
-	msg = prepare_email(setting_file, location)
-	# Send the message via local SMTP server.
-	with smtplib.SMTP('localhost') as s:
-		s.send_message(msg)
+    def send_email():
+        """"send the message via local SMTP server."""
+        with smtplib.SMTP('localhost') as s:
+            s.send_message(self.msg)
 
+# functions
 def get_arguments():
-	parser = ArgumentParser(description="""Send a notification email to user""")
-	parser.add_argument('-s', '--setting', required=True, help="""a yaml file specifying detailed information.""")
-	parser.add_argument('-l', '--location', choices=['sftp','aws'], default='sftp', help="""data location either sftp or aws.""")
-	return parser.parse_args()
+    """fetch commandline arguments."""
+    parser = ArgumentParser(description="""Send a notification email to user""", formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-s', '--setting', required=True, help="""a yaml file specifying detailed information.""")
+    parser.add_argument('-l', '--location', choices=['sftp','aws'], default='sftp', help="""data location either sftp or aws.""")
+    parser.add_argument('-f', '--fastq', help="""path to the fastq files""")
+    return parser.parse_args()
 
+def main():
+    """call me to get started!"""
+    args = get_arguments()
+    m = MyEmail(args)
+    m.initialize_settings()
+    m.prepare_main_text()
+    m.prepare_email()
+    print(m.msg)
+    #m.send_email()
+
+# main
 if __name__ == '__main__':
-	args = get_arguments()
-	send_email(args.setting, args.location)
+    main()
+    #with open('/tmp/1.yaml', 'w') as fout:
+    #    yaml.dump(setdic, fout, default_flow_style=False)
 
