@@ -377,6 +377,7 @@ class MyEmail:
         # attachments section
         if not self.setdic['attachments']['demuxSum']:
             print('warning: demux summary files are missing.')
+        print('')
         return myPass
 
     def print_main_text(self):
@@ -408,11 +409,13 @@ class MyEmail:
         self.__repr__()
 
     def send_email(self):
-        """"send the message via local SMTP server."""
+        """send the message via local SMTP server."""
         # send out email only if passing settings check and '--email' option is turned on
         if self.args.email and self.check_settings():
             with smtplib.SMTP('localhost') as s:
                 s.send_message(self.msg)
+        else:
+            print('once ready, please use --email option to send this email out!\n')
 
 # functions
 def get_arguments():
