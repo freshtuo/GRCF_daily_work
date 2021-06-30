@@ -70,6 +70,9 @@ class MyEmail:
             self.setdic['core'] = {'name':'Adrian', 'fromEmail':'yit2001@med.cornell.edu', 'ccEmails':['yit2001@med.cornell.edu', 'taz2008@med.cornell.edu']}
             # 'attachments' section: files to attach
             self.setdic['attachments'] = {'demuxSum':[], 'other':[]}
+        # user assigned library type?
+        if self.args.library is not None:
+            self.setdic['run']['libType'] = self.args.library
 
     def infer_instrument(self):
         """guess which sequencer was used"""
@@ -207,6 +210,8 @@ class MyEmail:
 
     def infer_settings(self):
         """infer settings based on fastq path, and overwrite the current one"""
+        if self.args.fastq is None:
+            return None
         # instrument
         self.infer_instrument()
         # date
@@ -219,6 +224,19 @@ class MyEmail:
         self.infer_nsamples()
         # demuxSum
         self.infer_demuxsum()
+
+    def write_settings(self):
+        """write settings to file"""
+        setting_file = self.args.setting
+        # write only if:
+        # 1) the setting file does not exist
+        # 2) or --overwrite option is on
+        if exists(setting_file) and (not self.args.overwrite):
+            print('setting file already exists. use --overwrite to force writing to it!')
+            return None
+        else:
+            with open(setting_file, 'w') as fout:
+                yaml.dump(self.setdic, fout, default_flow_style=False)
 
     def prepare_main_text(self):
         """prepare email main text"""
@@ -281,7 +299,7 @@ class MyEmail:
         libtype = self.setdic['run']['libType']
         seqtype = self.setdic['run']['seqType']
         readlen = '+'.join(['{}'.format(x) for x in self.setdic['run']['readLen']])
-        e_tos = [self.setdic['user']['email'], self.setdic['user']['piEmail']]
+        e_tos = list(set([self.setdic['user']['email'], self.setdic['user']['piEmail']]))
         e_ccs = self.setdic['core']['ccEmails']
         e_from = self.setdic['core']['fromEmail']
         # demultiplex summary files
@@ -316,10 +334,26 @@ class MyEmail:
             with open(dfile, 'rb') as fp:
                 self.msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=basename(dfile))
 
-    def send_email():
+    def check_settings(self):
+        """check settings before sending out email."""
+
+    def print_main_text(self):
+        """show email main text."""
+
+    def print_msg(self):
+        """print full email message."""
+
+    def __repr__(self):
+        """print settings."""
+
+    def print_settings(self):
+        """print settings."""
+
+    def send_email(self):
         """"send the message via local SMTP server."""
-        with smtplib.SMTP('localhost') as s:
-            s.send_message(self.msg)
+        if self.args.email:
+            with smtplib.SMTP('localhost') as s:
+                s.send_message(self.msg)
 
 # functions
 def get_arguments():
@@ -327,7 +361,13 @@ def get_arguments():
     parser = ArgumentParser(description="""Send a notification email to user""", formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-s', '--setting', required=True, help="""a yaml file specifying detailed information.""")
     parser.add_argument('-l', '--location', choices=['sftp','aws'], default='sftp', help="""data location either sftp or aws.""")
+    parser.add_argument('-b', '--library', default='RNAseq', help="""library type.""")
     parser.add_argument('-f', '--fastq', help="""absolute path to the fastq files, do not put '/' at the end!!!""")
+    parser.add_argument('-w', '--overwrite', action='store_true', help="""allow overwriting setting file.""")
+    parser.add_argument('-e', '--email', action='store_true', help="""allow sending out email.""")
+    parser.add_argument('-t', '--text', action='store_true', help="""print email main text.""")
+    parser.add_argument('-m', '--msg', action='store_true', help="""print full email msg.""")
+    parser.add_argument('-p', '--print', action='store_true', help="""print settings.""")
     return parser.parse_args()
 
 def main():
@@ -336,14 +376,13 @@ def main():
     m = MyEmail(args)
     m.initialize_settings()
     m.infer_settings()
+    m.write_settings()
     m.prepare_main_text()
     m.prepare_email()
     #print(m.msg)
-    #m.send_email()
+    m.send_email()
 
 # main
 if __name__ == '__main__':
     main()
-    #with open('/tmp/1.yaml', 'w') as fout:
-    #    yaml.dump(setdic, fout, default_flow_style=False)
 
