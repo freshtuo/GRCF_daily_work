@@ -48,6 +48,8 @@ class MyEmail:
             'NextSeq500':('Read1','Read2'),
             'NextSeq2000':('Read1','Read2'),
             'MiSeq':('RunInfoRead','NumCycles')}
+        # fastq path (in order to remove the last '/' character if any)
+        self.fastq_path = ''
 
     def get_time(self):
         """get current time"""
@@ -58,6 +60,7 @@ class MyEmail:
         setting_file = self.args.setting
         # read from setting yaml if exists
         if exists(setting_file):
+            print('load settings from file {}\n'.format(setting_file))
             with open(setting_file, 'r') as fset:
                 self.setdic = yaml.safe_load(fset)
         else:
@@ -73,11 +76,18 @@ class MyEmail:
         # user assigned library type?
         if self.args.library is not None:
             self.setdic['run']['libType'] = self.args.library
+        # user assigned fastq path?
+        if self.args.fastq is not None:
+            self.fastq_path = self.args.fastq
+            # remove the last '/' if it appears at the end of the fastq path
+            if self.fastq_path[-1] == '/':
+                self.fastq_path = self.fastq_path[:-1]
+            
 
     def infer_instrument(self):
         """guess which sequencer was used"""
         for ins in self.instruments:
-            if ins in self.args.fastq:
+            if ins in self.fastq_path:
                 self.setdic['run']['instrument'] = ins
                 print('Infer instrument: {}'.format(ins))
                 break
@@ -85,7 +95,7 @@ class MyEmail:
     def infer_date(self):
         """guess sequencing date"""
         # e.g. '210615_A00814_0436_BH7VLVDSX2'
-        tpat = search('/(\d+)_[a-zA-Z0-9]+_\d+', self.args.fastq)
+        tpat = search('/(\d+)_[a-zA-Z0-9]+_\d+', self.fastq_path)
         if tpat:
             date = tpat.groups()[0]
             self.setdic['run']['date'] = '20{}_{}_{}'.format(date[:2], date[2:4], date[4:])
@@ -94,7 +104,7 @@ class MyEmail:
     def infer_ilab(self):
         """guess iLab id"""
         # Loda-MJ-10557_2021_06_15
-        items = self.args.fastq.split('/')[-1].split('-')
+        items = self.fastq_path.split('/')[-1].split('-')
         if len(items) > 2:
             tpat = search('(\d+)',items[2])
             if tpat:
@@ -105,7 +115,7 @@ class MyEmail:
     def infer_run_folder(self):
         """guess sequencing run folder"""
         # locate 'Unaligned' in fastq path
-        items = self.args.fastq.split('/')
+        items = self.fastq_path.split('/')
         pos = -1
         for k,x in enumerate(items):
             if 'Unaligned' in x:
@@ -178,10 +188,10 @@ class MyEmail:
         """guess number of sequenced samples"""
         # search for fastq files
         # e.g. 10_S10_L001_R1_001.fastq.gz
-        sids = list(set([search('.*_S(\d+)_L00\d+_R1_001',tfile).groups()[0] for tfile in listdir(self.args.fastq) if search('R1_001\.fastq\.gz',tfile)]))
+        sids = list(set([search('.*_S(\d+)_L00\d+_R1_001',tfile).groups()[0] for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]))
         # search for folders other than 'Summary' if failing to find *.fastq.gz
         if not sids:
-            sids = [tfile for tfile in listdir(self.args.fastq) if isdir('{}/{}'.format(self.args.fastq,tfile)) and tfile != 'Summary']
+            sids = [tfile for tfile in listdir(self.fastq_path) if isdir('{}/{}'.format(self.fastq_path,tfile)) and tfile != 'Summary']
         # update info in settings
         if sids:
             self.setdic['run']['nSamples'] = len(sids)
@@ -195,23 +205,23 @@ class MyEmail:
         if self.setdic['run']['instrument'] not in ['NextSeq2000','MiSeq']:
             fcid = fcid[1:]# the first letter refers to flowcell A or B
         # get user folder
-        user_folder = self.args.fastq.split('/')[-1]
+        user_folder = self.fastq_path.split('/')[-1]
         # locate report folder
         demuxs = []
-        for x in listdir('{}/Reports/html/{}'.format('/'.join(self.args.fastq.split('/')[:-1]), fcid)):
+        for x in listdir('{}/Reports/html/{}'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid)):
             if x in user_folder:# find it!
-                demuxs.append('{}/Reports/html/{}/{}/all/all/lane.html'.format('/'.join(self.args.fastq.split('/')[:-1]), fcid, x))
-                demuxs.append('{}/Reports/html/{}/{}/all/all/laneBarcode.html'.format('/'.join(self.args.fastq.split('/')[:-1]), fcid, x))
+                demuxs.append('{}/Reports/html/{}/{}/all/all/lane.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
+                demuxs.append('{}/Reports/html/{}/{}/all/all/laneBarcode.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
         # update info in settings
         if demuxs:
             self.setdic['attachments']['demuxSum'] = demuxs
             print('infer demux summary: {}'.format(demuxs))
-            #if isdir('{}/Reports/html/{}/{}'.format('/'.join(self.args.fastq.split('/')[:-1]), fcid, x)):
 
     def infer_settings(self):
         """infer settings based on fastq path, and overwrite the current one"""
         if self.args.fastq is None:
             return None
+        print('infer settings based on fastq path {}'.format(self.args.fastq))
         # instrument
         self.infer_instrument()
         # date
@@ -224,6 +234,7 @@ class MyEmail:
         self.infer_nsamples()
         # demuxSum
         self.infer_demuxsum()
+        print('')
 
     def write_settings(self):
         """write settings to file"""
@@ -232,9 +243,13 @@ class MyEmail:
         # 1) the setting file does not exist
         # 2) or --overwrite option is on
         if exists(setting_file) and (not self.args.overwrite):
-            print('setting file already exists. use --overwrite to force writing to it!')
+            print('setting file already exists. use --overwrite to force writing to it!\n')
             return None
         else:
+            if not exists(setting_file):
+                print('write settings to file {}\n'.format(setting_file))
+            else:
+                print('overwrite setting file {}\n'.format(setting_file))
             with open(setting_file, 'w') as fout:
                 yaml.dump(self.setdic, fout, default_flow_style=False)
 
@@ -317,7 +332,10 @@ class MyEmail:
              if exists(other_file):
                  other.append(other_file)
         # create email message
-        self.msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
+        if self.args.note is None:
+            self.msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
+        else:
+            self.msg['Subject'] = '{} {}{} {} {} sequencing data {}'.format(instrument,seqtype,readlen,date,libtype,self.args.note)
         self.msg['To'] = ', '.join(e_tos)
         self.msg['Cc'] = ', '.join(e_ccs)
         self.msg['From'] = e_from
@@ -366,14 +384,14 @@ class MyEmail:
         if self.args.text:
             print('##################################### main text ######################################')
             print(self.main_text)
-            print('######################################################################################')
+            print('######################################################################################\n')
 
     def print_msg(self):
         """print full email message."""
         if self.args.msg:
             print('################################### full email msg ###################################')
             print(self.msg)
-            print('######################################################################################')
+            print('######################################################################################\n')
 
     def __repr__(self):
         """print settings."""
@@ -383,7 +401,7 @@ class MyEmail:
                 print('\t{}:'.format(section))
                 for item in self.setdic[section]:
                     print('\t\t{}: {}'.format(item, self.setdic[section][item]))
-            print('######################################################################################')
+            print('######################################################################################\n')
 
     def print_settings(self):
         """print settings."""
@@ -409,6 +427,7 @@ def get_arguments():
     parser.add_argument('-t', '--text', action='store_true', help="""print email main text.""")
     parser.add_argument('-m', '--msg', action='store_true', help="""print full email msg.""")
     parser.add_argument('-p', '--print', action='store_true', help="""print settings.""")
+    parser.add_argument('-n', '--note', help="""include a note at the end of email subject.""")
     return parser.parse_args()
 
 
