@@ -336,22 +336,63 @@ class MyEmail:
 
     def check_settings(self):
         """check settings before sending out email."""
+        myPass = True
+        # run section
+        if self.setdic['run']['iLab'] == -1:
+            print('warning: iLab id is missing.')
+        if self.setdic['run']['libType'] == '':
+            print('warning: library type is missing.')
+        if self.setdic['run']['nSamples'] == 0:
+            print('warning: number of samples is missing.')
+        if self.setdic['run']['instrument'] == '':
+            print('warning: sequencer info is missing.')
+        if not self.setdic['run']['readLen']:
+            print('warning: read length is missing.')
+        if self.setdic['run']['date'] == '':
+            print('warning: sequencing date is missing.')
+        # user section
+        for item in ['name','email','piEmail','dataPath']:
+            if not self.setdic['user'][item]:
+                print('error: user {} is missing.'.format(item))
+                myPass = False
+        # core section (skipped)
+        # attachments section
+        if not self.setdic['attachments']['demuxSum']:
+            print('warning: demux summary files are missing.')
+        return myPass
 
     def print_main_text(self):
         """show email main text."""
+        if self.args.text:
+            print('##################################### main text ######################################')
+            print(self.main_text)
+            print('######################################################################################')
 
     def print_msg(self):
         """print full email message."""
+        if self.args.msg:
+            print('################################### full email msg ###################################')
+            print(self.msg)
+            print('######################################################################################')
 
     def __repr__(self):
         """print settings."""
+        if self.args.print:
+            print('###################################### settings ######################################')
+            for section in ['run','user','core','attachments']:
+                print('\t{}:'.format(section))
+                for item in self.setdic[section]:
+                    print('\t\t{}: {}'.format(item, self.setdic[section][item]))
+            print('######################################################################################')
 
     def print_settings(self):
         """print settings."""
+        self.__repr__()
 
     def send_email(self):
         """"send the message via local SMTP server."""
-        if self.args.email:
+        # send out email only if passing settings check and '--email' option is turned on
+        if self.args.email and self.check_settings():
             with smtplib.SMTP('localhost') as s:
                 s.send_message(self.msg)
 
@@ -370,6 +411,7 @@ def get_arguments():
     parser.add_argument('-p', '--print', action='store_true', help="""print settings.""")
     return parser.parse_args()
 
+
 def main():
     """call me to get started!"""
     args = get_arguments()
@@ -379,7 +421,10 @@ def main():
     m.write_settings()
     m.prepare_main_text()
     m.prepare_email()
-    #print(m.msg)
+    ##print(m.check_settings())
+    m.print_main_text()
+    m.print_msg()
+    m.print_settings()
     m.send_email()
 
 # main
