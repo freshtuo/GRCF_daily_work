@@ -396,17 +396,17 @@ class MyEmail:
 
     def __repr__(self):
         """print settings."""
-        if self.args.print:
-            print('###################################### settings ######################################')
-            for section in ['run','user','core','attachments']:
-                print('\t{}:'.format(section))
-                for item in self.setdic[section]:
-                    print('\t\t{}: {}'.format(item, self.setdic[section][item]))
-            print('######################################################################################\n')
+        print('###################################### settings ######################################')
+        for section in ['run','user','core','attachments']:
+            print('{}:'.format(section))
+            for item in self.setdic[section]:
+                print('\t{}: {}'.format(item, self.setdic[section][item]))
+        print('######################################################################################\n')
 
     def print_settings(self):
         """print settings."""
-        self.__repr__()
+        if self.args.print:
+            self.__repr__()
 
     def send_email(self):
         """send the message via local SMTP server."""
