@@ -104,7 +104,7 @@ class MyEmail:
     def infer_ilab(self):
         """guess iLab id"""
         # Loda-MJ-10557_2021_06_15
-        items = self.fastq_path.split('/')[-1].split('-')
+        items = self.fastq_path.split('/')[-1].replace('GRCF-','').split('-')
         if len(items) > 2:
             tpat = search('(\d+)',items[2])
             if tpat:
