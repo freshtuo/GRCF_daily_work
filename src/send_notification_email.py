@@ -217,6 +217,25 @@ class MyEmail:
             self.setdic['attachments']['demuxSum'] = demuxs
             print('infer demux summary: {}'.format(demuxs))
 
+    def infer_data_path(self):
+        """guess data path"""
+        # get log path where the data path is stored
+        logs_path = '/'.join(self.fastq_path.split('/')[:-1]+['logs'])
+        # get user folder
+        user_folder = self.fastq_path.split('/')[-1]
+        # infer data path based on their location
+        if self.args.location == 'aws':
+            url_file = '{}/{}.aws_s3.transfer.URL'.format(logs_path, user_folder)
+            # check file existence
+            if exists(url_file):
+                with open(url_file, 'r') as furl:
+                    tpat = search('^URL:\s*(.*)',furl.readline())
+                    if tpat:
+                        self.setdic['user']['dataPath'] = tpat.groups()[0]
+                        print('infer data path: {}'.format(self.setdic['user']['dataPath']))
+        elif self.args.location == 'sftp':
+            url_file = '{}/{}.sftp.transfer.URL'.format(logs_path, user_folder)
+
     def infer_settings(self):
         """infer settings based on fastq path, and overwrite the current one"""
         # fastq location assigned by user?
@@ -238,6 +257,8 @@ class MyEmail:
         self.infer_nsamples()
         # demuxSum
         self.infer_demuxsum()
+        # dataPath
+        self.infer_data_path()
         print('')
 
     def write_settings(self):
