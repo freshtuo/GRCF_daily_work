@@ -95,7 +95,7 @@ class MyEmail:
     def infer_date(self):
         """guess sequencing date"""
         # e.g. '210615_A00814_0436_BH7VLVDSX2'
-        tpat = search('/(\d+)_[a-zA-Z0-9]+_\d+', self.fastq_path)
+        tpat = search('/(\d+)_[a-zA-Z0-9\-]+_\d+', self.fastq_path)
         if tpat:
             date = tpat.groups()[0]
             self.setdic['run']['date'] = '20{}_{}_{}'.format(date[:2], date[2:4], date[4:])
