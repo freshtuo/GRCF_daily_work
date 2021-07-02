@@ -83,7 +83,6 @@ class MyEmail:
             if self.fastq_path[-1] == '/':
                 self.fastq_path = self.fastq_path[:-1]
             
-
     def infer_instrument(self):
         """guess which sequencer was used"""
         for ins in self.instruments:
@@ -453,7 +452,7 @@ def get_arguments():
     parser = ArgumentParser(description="""Send a notification email to user""", formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-s', '--setting', required=True, help="""a yaml file specifying detailed information.""")
     parser.add_argument('-l', '--location', choices=['sftp','aws'], default='sftp', help="""data location either sftp or aws.""")
-    parser.add_argument('-b', '--library', default='RNAseq', help="""library type.""")
+    parser.add_argument('-b', '--library', help="""library type.""")
     parser.add_argument('-f', '--fastq', help="""absolute path to the fastq files, do not put '/' at the end!!!""")
     parser.add_argument('-w', '--overwrite', action='store_true', help="""allow overwriting setting file.""")
     parser.add_argument('-e', '--email', action='store_true', help="""allow sending out email.""")
