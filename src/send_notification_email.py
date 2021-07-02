@@ -219,7 +219,11 @@ class MyEmail:
 
     def infer_settings(self):
         """infer settings based on fastq path, and overwrite the current one"""
+        # fastq location assigned by user?
         if self.args.fastq is None:
+            return None
+        # fastq location exists?
+        if not exists(self.fastq_path):
             return None
         print('infer settings based on fastq path {}'.format(self.args.fastq))
         # instrument
