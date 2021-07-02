@@ -8,7 +8,7 @@ scripts in hope of simplifying daily work at GRCF
 usage: send_notification_email.py [-h] -s SETTING [-l {sftp,aws}] [-b LIBRARY]
                                   [-f FASTQ] [-w] [-e] [-t] [-m] [-p]
                                   [-n NOTE]
-</pre>
+
 Send a notification email to user
 
 optional arguments:
@@ -30,4 +30,5 @@ optional arguments:
   -p, --print           print settings. (default: False)
   -n NOTE, --note NOTE  include a note at the end of email subject. (default:
                         None)
+</pre>
 
