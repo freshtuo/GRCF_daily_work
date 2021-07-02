@@ -319,18 +319,18 @@ class MyEmail:
         e_from = self.setdic['core']['fromEmail']
         # demultiplex summary files
         demuxsum = []
-        if 'demuxsum' in self.setdic['attachments']:
+        if 'demuxSum' in self.setdic['attachments']:
             for sum_file in self.setdic['attachments']['demuxSum']:
-             # file exists?
-             if exists(sum_file):
-                 demuxsum.append(sum_file)
+                # file exists?
+                if exists(sum_file):
+                    demuxsum.append(sum_file)
         # other files
         other = []
         if 'other' in self.setdic['attachments']:
             for other_file in self.setdic['attachments']['other']:
-             # file exists?
-             if exists(other_file):
-                 other.append(other_file)
+                # file exists?
+                if exists(other_file):
+                    other.append(other_file)
         # create email message
         if self.args.note is None:
             self.msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
