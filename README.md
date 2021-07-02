@@ -4,7 +4,7 @@ scripts in hope of simplifying daily work at GRCF
 
 1. script for preparing and sending out notification emails to users
 
-usage: send_notification_email.py [-h] -s SETTING [-l {sftp,aws}] [-b LIBRARY]\
+usage: send_notification_email.py [-h] -s SETTING [-l {sftp,aws}] [-b LIBRARY]<br />
                                   [-f FASTQ] [-w] [-e] [-t] [-m] [-p]\
                                   [-n NOTE]
 
