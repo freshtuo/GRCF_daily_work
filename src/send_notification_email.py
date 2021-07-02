@@ -229,12 +229,17 @@ class MyEmail:
             # check file existence
             if exists(url_file):
                 with open(url_file, 'r') as furl:
-                    tpat = search('^URL:\s*(.*)',furl.readline())
+                    tpat = search('^URL:\s*(.*)',furl.readline().strip())
                     if tpat:
                         self.setdic['user']['dataPath'] = tpat.groups()[0]
                         print('infer data path: {}'.format(self.setdic['user']['dataPath']))
         elif self.args.location == 'sftp':
-            url_file = '{}/{}.sftp.transfer.URL'.format(logs_path, user_folder)
+            url_file = '{}/{}.sftp.path'.format(logs_path, user_folder)
+            # check file existence
+            if exists(url_file):
+                with open(url_file, 'r') as furl:
+                    self.setdic['user']['dataPath'] = furl.readline().strip()
+                    print('infer data path: {}'.format(self.setdic['user']['dataPath']))
 
     def infer_settings(self):
         """infer settings based on fastq path, and overwrite the current one"""
