@@ -25,6 +25,7 @@ from email.message import EmailMessage
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 from re import search
+from re import findall
 
 # class
 class MyEmail:
@@ -102,14 +103,12 @@ class MyEmail:
 
     def infer_ilab(self):
         """guess iLab id"""
-        # Loda-MJ-10557_2021_06_15
-        items = self.fastq_path.split('/')[-1].replace('GRCF-','').split('-')
-        if len(items) > 2:
-            tpat = search('(\d+)',items[2])
-            if tpat:
-                ilab = int(tpat.groups()[0])
-                self.setdic['run']['iLab'] = ilab
-                print('Infer iLab id: {}'.format(ilab))
+        # Loda-MJ-10557_2021_06_15 or Diaz-Meco-MADM-10830_2021_07_19
+        tmatches = findall('(\d+)', self.fastq_path.split('/')[-1])
+        if tmatches:
+            ilab = tmatches[0]
+            self.setdic['run']['iLab'] = ilab
+            print('Infer iLab id: {}'.format(ilab))
 
     def infer_run_folder(self):
         """guess sequencing run folder"""
