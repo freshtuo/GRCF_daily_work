@@ -289,7 +289,7 @@ class MyEmail:
         nsamples = self.setdic['run']['nSamples']
         dataloc = self.setdic['user']['dataPath']
         if isinstance(dataloc, list):
-            dataloc = '<br>'.join(dataloc)
+            dataloc = '<br><br>'.join(dataloc)
         username = self.setdic['user']['name']
         sender = self.setdic['core']['name']
         # update main text
