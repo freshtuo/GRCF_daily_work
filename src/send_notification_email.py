@@ -292,6 +292,9 @@ class MyEmail:
             dataloc = '<br><br>'.join(dataloc)
         username = self.setdic['user']['name']
         sender = self.setdic['core']['name']
+        mynote = self.args.note
+        if mynote != '':
+            mynote = '<p>{}</p>'.format(mynote)
         # update main text
         if self.args.location == 'sftp':
             self.main_text = """\
@@ -311,12 +314,13 @@ class MyEmail:
     <p>You can certainly use terminal to access it but a ftp client like Filezilla (https://filezilla-project.org/) might make your life easier.</p>
     <p><b>The data will be available for 4 weeks, after that they will be removed from the server. 
           Please download your data on time.</b></p>
+    {}
     <p>The run summary was attached. Please let us know if there are any problems.</p>
     <p>Best,</p>
     <p>{}</p>
   </body>
 </html>
-""".format(username,instrument,nsamples,ilab,dataloc,sender)
+""".format(username,instrument,nsamples,ilab,dataloc,mynote,sender)
         elif self.args.location == 'aws':
             self.main_text = """\
 <html>
@@ -330,12 +334,13 @@ class MyEmail:
        or through a Linux terminal with a command like this one: </p>
     <p>wget -O YOU-PREFERED-FILE-NAME.tar  “THE-ABOVE-URL"</p>
     <p><b>The data will be available for 7 days only, after that they will be removed. Please download your data on time.</b></p>
+    {}
     <p>The run summary was attached. Please let us know if there are any problems.</p>
     <p>Best,</p>
     <p>{}</p>
   </body>
 </html>
-""".format(username,instrument,nsamples,ilab,dataloc,sender)
+""".format(username,instrument,nsamples,ilab,dataloc,mynote,sender)
 
     def prepare_email(self):
         # collect info
@@ -362,10 +367,10 @@ class MyEmail:
                 if exists(other_file):
                     other.append(other_file)
         # create email message
-        if self.args.note is None:
+        if self.args.suffix is None:
             self.msg['Subject'] = '{} {}{} {} {} sequencing data'.format(instrument,seqtype,readlen,date,libtype)
         else:
-            self.msg['Subject'] = '{} {}{} {} {} sequencing data {}'.format(instrument,seqtype,readlen,date,libtype,self.args.note)
+            self.msg['Subject'] = '{} {}{} {} {} sequencing data {}'.format(instrument,seqtype,readlen,date,libtype,self.args.suffix)
         self.msg['To'] = ', '.join(e_tos)
         self.msg['Cc'] = ', '.join(e_ccs)
         self.msg['From'] = e_from
@@ -460,7 +465,8 @@ def get_arguments():
     parser.add_argument('-t', '--text', action='store_true', help="""print email main text.""")
     parser.add_argument('-m', '--msg', action='store_true', help="""print full email msg.""")
     parser.add_argument('-p', '--print', action='store_true', help="""print settings.""")
-    parser.add_argument('-n', '--note', help="""include a note at the end of email subject.""")
+    parser.add_argument('-x', '--suffix', help="""add a suffix to the end of email subject""")
+    parser.add_argument('-n', '--note', default='', help="""include a note to the email main text.""")
     return parser.parse_args()
 
 
