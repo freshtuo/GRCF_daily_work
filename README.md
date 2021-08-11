@@ -28,7 +28,9 @@ optional arguments:
   -t, --text            print email main text. (default: False)
   -m, --msg             print full email msg. (default: False)
   -p, --print           print settings. (default: False)
-  -n NOTE, --note NOTE  include a note at the end of email subject. (default:
+  -x SUFFIX, --suffix SUFFIX
+                        add a suffix to the end of email subject (default:
                         None)
+  -n NOTE, --note NOTE  include a note to the email main text. (default: )
 </pre>
 
