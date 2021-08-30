@@ -359,7 +359,7 @@ class MyDemux:
                 frs.write('  --barcode-mismatches 0')
             if self.no_lane_split:
                 frs.write('  --no-lane-splitting')
-            frs.write('  >run_bcl2fq.{}.log\n'%(sn+1))
+            frs.write('  >run_bcl2fq_grp{}.log\n'.format(sn+1))
 
     def generate_scripts(self):
         """generate sub-samplesheet and shell script"""
