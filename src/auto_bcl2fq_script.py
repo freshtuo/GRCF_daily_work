@@ -50,6 +50,8 @@ class MyDemux:
             self.samplesheet_folder = '{}/Data/Intensities/BaseCalls'.format(self.run_folder)
         else:
             self.samplesheet_folder = args.samplesheetdir
+        # stringent mode?
+        self.stringent = args.stringent
         # overwrite existing output script file?
         self.overwrite = args.force
         # no lane splitting?
@@ -262,7 +264,10 @@ class MyDemux:
         mindists['mismatch_1'] = mindists.apply(lambda x:x['mindist'] > 3, axis=1)
         # 2) multiple index type in a lane? then no mismatches
         mindists = mindists.merge(mindists.groupby(by=['Lane'])['Lane'].count().reset_index(name='num_index_type'), how='left', on='Lane')
-        mindists['mismatch_2'] = mindists.apply(lambda x:x['num_index_type'] == 1, axis=1)
+        if self.stringent:
+            mindists['mismatch_2'] = mindists.apply(lambda x:x['num_index_type'] == 1, axis=1)
+        else:
+            mindists['mismatch_2'] = True
         # 3) use consistent allowed mismatches for the same project + index type
         # conclusion should be drawn based on mismatch_1 & mismatch_2
         mindists['mismatch_1&2'] = mindists['mismatch_1'] & mindists['mismatch_2']
@@ -396,6 +401,7 @@ def get_arguments():
     parser.add_argument("-b", "--bcl2fastq", nargs="?", required=False, default="/usr/local/bin/bcl2fastq", help="location of bcl2fastq program", metavar="bcl2fastq", dest="bcl2fastq")
     parser.add_argument("-o", "--scriptdir", nargs="?", required=False, default=None, help="output folder to write shell script(s) (default: run_folder)", metavar="script_folder", dest="scriptdir")
     parser.add_argument("-e", "--samplesheetdir", nargs="?", required=False, default=None, help="output folder to write samplesheet(s) (default: basecall_folder)", metavar="samplesheet_folder", dest="samplesheetdir")
+    parser.add_argument("-t", "--stringent", action="store_true", required=False, default=False, help="stringent mode: no mismatches allowed for lanes with multiple index types", dest="stringent")
     parser.add_argument("-f", "--force", action="store_true", required=False, default=False, help="whether or not to overwrite output script if existing", dest="force")
     parser.add_argument("-n", "--no-lane-splitting", action="store_true", required=False, default=False, help="whether or not to add --no-lane-splitting option to shell script", dest="nosplit")
     parser.add_argument("-p", "--platform", nargs="?", required=False, default="novaseq", choices=["hiseq","nextseq500","nextseq2000","novaseq"], help="sequencing platform", dest="platform")
