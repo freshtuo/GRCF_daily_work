@@ -354,7 +354,7 @@ class MyDemux:
             # shell script
             frs.write('nohup {}  --runfolder-dir {}/  --output-dir {}/Unaligned_{}/'.format(self.bcl2fastq, self.run_folder, self.run_folder, sn+1))
             frs.write('  --sample-sheet {}/samplesheet_grp{}.csv'.format(self.samplesheet_folder, sn+1))
-            frs.write('--use-bases-mask {}'.format(mask))
+            frs.write('  --use-bases-mask {}'.format(mask))
             if not allow_mismatch:
                 frs.write('  --barcode-mismatches 0')
             if self.no_lane_split:
