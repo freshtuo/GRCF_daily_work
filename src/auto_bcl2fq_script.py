@@ -264,8 +264,11 @@ class MyDemux:
         mindists = mindists.merge(mindists.groupby(by=['Lane'])['Lane'].count().reset_index(name='num_index_type'), how='left', on='Lane')
         mindists['mismatch_2'] = mindists.apply(lambda x:x['num_index_type'] == 1, axis=1)
         # 3) use consistent allowed mismatches for the same project + index type
+        # conclusion should be drawn based on mismatch_1 & mismatch_2
+        mindists['mismatch_1&2'] = mindists['mismatch_1'] & mindists['mismatch_2']
+        # add Sample_Project info (one column)
         mindists = self.table[['Lane','index_len','index2_len','Sample_Project']].drop_duplicates(['Lane','index_len','index2_len','Sample_Project']).merge(mindists, how='left', on=['Lane','index_len','index2_len'])
-        mindists = mindists.merge(mindists.groupby(by=['index_len','index2_len','Sample_Project'])['mismatch_1'].all().reset_index(name='mismatch_3'), how='left', on=['index_len','index2_len','Sample_Project'])
+        mindists = mindists.merge(mindists.groupby(by=['index_len','index2_len','Sample_Project'])['mismatch_1&2'].all().reset_index(name='mismatch_3'), how='left', on=['index_len','index2_len','Sample_Project'])
         # final assignment by taking and on all three filters
         mindists['allow_mismatches'] = mindists['mismatch_1'] & mindists['mismatch_2'] & mindists['mismatch_3']
         # add to the sample table
