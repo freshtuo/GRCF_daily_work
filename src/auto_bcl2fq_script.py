@@ -36,6 +36,8 @@ class MyDemux:
         self.run_folder = args.runfolder
         # input samplesheet file
         self.samplesheet_file = args.infile
+        # only a single lane in the samplesheet?
+        self.single_lane = False
         # skiplanes
         self.skip_lanes = args.skip
         # bcl2fastq program
@@ -165,6 +167,7 @@ class MyDemux:
         # add 'Lane' column if it does not exists, and fill in 1
         if 'Lane' not in self.table.columns:
             self.table['Lane'] = 1
+            self.single_lane = True
         # skip lanes as desired
         self.table = self.table[~self.table['Lane'].isin(self.skip_lanes)]
         print('ok.')
@@ -175,7 +178,15 @@ class MyDemux:
         # calculate overall counts
         ##dup_counts = self.table.groupby(by=group).apply(lambda x: x.duplicated(column).sum()).reset_index(name='counts')
         # label each entry according to whether or not it's a duplicate
-        dup_marks = self.table.groupby(by=group).apply(lambda x: x.duplicated(column)).rename_axis(group+['index']).reset_index(name='duplicate')#.set_index('index')
+        dup_marks = self.table.groupby(by=group, squeeze=True).apply(lambda x: x.duplicated(column))
+        # depending on whether or not the samplesheet contains only a single lane
+        # the processing is slightly different due to how groupby.apply deals with single group
+        # https://github.com/pandas-dev/pandas/issues/5839
+        # https://stackoverflow.com/questions/62102565/groupby-apply-makes-an-unwanted-transpose-when-there-is-only-one-group
+        if self.single_lane:
+            dup_marks = dup_marks.reset_index(name='duplicate')
+        else:
+            dup_marks = dup_marks.rename_axis(group+['index']).reset_index(name='duplicate')#.set_index('index')
         # subset duplicated entries
         dups = self.table[group+column][self.table.index.isin(dup_marks['index'][dup_marks['duplicate']].tolist())]
         # any duplicates?
