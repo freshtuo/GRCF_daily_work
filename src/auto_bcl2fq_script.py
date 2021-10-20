@@ -168,8 +168,13 @@ class MyDemux:
         if 'Lane' not in self.table.columns:
             self.table['Lane'] = 1
             self.single_lane = True
+        elif len(self.table['Lane'].unique()) == 1:# only one lane (labeled)
+            self.single_lane = True
         # skip lanes as desired
         self.table = self.table[~self.table['Lane'].isin(self.skip_lanes)]
+        # convert columns to str in case any of them include numbers only
+        for column in self.columns_to_check:
+            self.table[column] = self.table[column].astype(str)
         print('ok.')
 
     def column_duplicated(self, group, column):
