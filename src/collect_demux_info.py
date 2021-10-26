@@ -141,7 +141,22 @@ class MyDemuxUnit:
         else:
             print('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
 
+    def __repr__(self):
+        """print info for a demux unit (project)"""
+        to_print = []
+        to_print.append('fastq folder: {}'.format(self.fastq_folder))
+        to_print.append('flowcell id: {}'.format(self.fcid))
+        to_print.append('report file: {}'.format(self.report_file))
+        to_print.append('iLab id: {}'.format(self.ilab))
+        to_print.append('project name: {}'.format(self.project))
+        to_print.append('sequence type: {}'.format(self.seqtype))
+        to_print.append('read 1 length: {}'.format(self.read_1_len))
+        to_print.append('read 2 length: {}'.format(self.read_2_len))
+        return '\n'.join(to_print)
+
 # MyDemuxRun: a sequencing run
+#class MyDemuxRun:
+    
 
 # functions
 def main():
@@ -151,6 +166,7 @@ def main():
     du.infer_seq_type()
     du.load_report()
     du.to_file('/tmp/test.txt')
+    print(du)
     #print(du.summary.columns)
 
 # main
