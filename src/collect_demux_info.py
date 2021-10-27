@@ -5,11 +5,15 @@
 
 import sys
 import gzip
-import pandas as pd
+import logging
 
-from os.path import exists
+import pandas as pd
+import xml.etree.ElementTree as ET
+import os.path
+
 from os import getcwd
 from os import listdir
+from os import walk
 from re import findall
 from re import search
 from argparse import ArgumentParser
@@ -53,8 +57,8 @@ class MyDemuxUnit:
             if tmatches:
                 self.ilab = int(tmatches[0])
                 self.project = folder_name[:folder_name.find(tmatches[0])-1]
-                print('Infer iLab id: {}'.format(self.ilab))
-                print('Infer PI info: {}'.format(self.project))
+                logging.debug('Infer iLab id: {}'.format(self.ilab))
+                logging.debug('Infer PI info: {}'.format(self.project))
 
     def infer_report_file(self):
         """guess demux report html file if not provided"""
@@ -66,9 +70,9 @@ class MyDemuxUnit:
             # guess report html file
             tsumfile = '/'.join(tfolders[:-1]+['Reports','html',self.fcid,tfolders[-1].split('_')[0],'all','all','laneBarcode.html'])
             # check file existence
-            if exists(tsumfile):
+            if os.path.exists(tsumfile):
                 self.report_file = tsumfile
-                print('Infer demux report html file: {}'.format(self.report_file))
+                logging.debug('Infer demux report html file: {}'.format(self.report_file))
 
     def guess_read_length(self, fastq_file, num_reads=100):
         """guess read length for a given fastq file"""
@@ -91,7 +95,9 @@ class MyDemuxUnit:
         """guess sequencing type and read length based on fastq files"""
         if self.seqtype is None or self.read_1_len is None:
             # fetch available fastq file
-            tfqs = [x for x in listdir(self.fastq_folder) if search('fastq\.gz',x)]
+            tfqs = []
+            for root, directories, files in walk(self.fastq_folder):
+                tfqs.extend([os.path.join(root, x) for x in files if search('fastq\.gz$',x) and not search('^Undetermined_',x)])
             # fastq files found?
             if len(tfqs) > 0:
                 # read 1/2 fastq
@@ -103,13 +109,13 @@ class MyDemuxUnit:
                 else:
                     self.seqtype = 'PE'
                 # read length
-                self.read_1_len = self.guess_read_length('{}/{}'.format(self.fastq_folder, tr1s[0]))
+                self.read_1_len = self.guess_read_length(tr1s[0])
                 if len(tr2s) > 0:
-                    self.read_2_len = self.guess_read_length('{}/{}'.format(self.fastq_folder, tr2s[0]))
-                print('Infer sequencing type: {}'.format(self.seqtype))
-                print('Infer read 1 length: {}'.format(self.read_1_len))
+                    self.read_2_len = self.guess_read_length(tr2s[0])
+                logging.debug('Infer sequencing type: {}'.format(self.seqtype))
+                logging.debug('Infer read 1 length: {}'.format(self.read_1_len))
                 if len(tr2s) > 0:
-                    print('Infer read 2 length: {}'.format(self.read_2_len))
+                    logging.debug('Infer read 2 length: {}'.format(self.read_2_len))
 
     def load_report(self):
         """extract demux summary from report file"""
@@ -117,12 +123,22 @@ class MyDemuxUnit:
             sumtables = pd.read_html(self.report_file, match='Sample')
             # double check on detected tables
             if len(sumtables) != 1:
-                print("Warning: more than one table with 'Sample' column detected in demux summary file {}".format(self.report_file))
+                logging.warning("More than one table with 'Sample' column detected in demux summary file {}".format(self.report_file))
             else:
                 self.summary = sumtables[0]
+            # replace 'Sample_' in the sample name
+            self.summary['Sample'] = self.summary['Sample'].astype('str')
+            self.summary['Sample'] = self.summary['Sample'].str.replace('^Sample_','')
 
-    def to_file(self, outfile):
-        """combine information and write to file"""
+    def infer_all(self):
+        """infer all available information"""
+        self.infer_ilab()
+        self.infer_report_file()
+        self.infer_seq_type()
+        self.load_report()
+
+    def prepare_table(self):
+        """combine information into a dataframe table"""
         # get a copy of summary for output purpose
         mytable = self.summary[self.columns].copy()
         # add other information
@@ -131,6 +147,12 @@ class MyDemuxUnit:
         mytable.insert(2, 'seqtype', [self.seqtype] * mytable.shape[0])
         mytable.insert(3, 'read1len', [self.read_1_len] * mytable.shape[0])
         mytable.insert(4, 'read2len', [self.read_2_len] * mytable.shape[0])
+        return mytable
+
+    def to_file(self, outfile):
+        """combine information and write to file"""
+        # combine information into a table
+        mytable = self.prepare_table()
         # write to file
         if search('\.xlsx$', outfile):
             mytable.to_excel(outfile, index=False)
@@ -139,7 +161,8 @@ class MyDemuxUnit:
         elif search('\.tsv$|\.txt$', outfile):
             mytable.to_csv(outfile, sep='\t', index=False)
         else:
-            print('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+            logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+        logging.info('write MyDemuxUnit to file: {}'.format(outfile))
 
     def __repr__(self):
         """print info for a demux unit (project)"""
@@ -155,12 +178,215 @@ class MyDemuxUnit:
         return '\n'.join(to_print)
 
 # MyDemuxRun: a sequencing run
-#class MyDemuxRun:
-    
+class MyDemuxRun:
+    """Class for saving info of an entire demux run"""
+
+    def __init__(self, run_folder, date=None, flowcell_id=None, platform=None, seqtype=None, read_1_len=-1, read_2_len=-1, index_1_len=-1, index_2_len=-1):
+        """class constructor"""
+        # run folder
+        self.run_folder = run_folder
+        # sequencing date
+        self.date = date
+        # flowcell id
+        self.fcid = flowcell_id
+        # sequencing platform
+        self.platform = platform
+        # run sequencing type
+        self.seqtype = seqtype
+        # run read length
+        self.read_1_len = read_1_len
+        self.read_2_len = read_2_len
+        self.index_1_len = index_1_len
+        self.index_2_len = index_2_len
+        # projects in this run
+        self.units = []
+
+    def infer_platform(self):
+        """infer platform from run folder"""
+        if self.platform is None:
+            if 'hiseq' in self.run_folder.lower():
+                self.platform = 'hiseq'
+            elif 'nextseq500' in self.run_folder.lower():
+                self.platform = 'nextseq500'
+            elif 'nextseq2000' in self.run_folder.lower():
+                self.platform = 'nextseq2000'
+            elif 'novaseq' in self.run_folder.lower():
+                self.platform = 'novaseq'
+            else:
+                logging.error('Failed to infer platform for {}'.format(self.platform))
+                sys.exit(7)
+            logging.debug('Infer platform: {}'.format(self.platform))
+
+    def infer_seq_date(self):
+        """guess date of sequencing"""
+        if self.date is None:
+            tdate = os.path.basename(self.run_folder).split('_')[0]
+            self.date = '20{}-{}-{}'.format(tdate[:2],tdate[2:4],tdate[4:])
+            logging.debug('Infer sequencing date: {}'.format(self.date))
+
+    def infer_flowcell_id(self):
+        """guess flowcell id"""
+        if self.fcid is None:
+            self.fcid = os.path.basename(self.run_folder).split('_')[-1]
+            if self.platform not in ['nextseq2000','miseq']:
+                self.fcid = self.fcid[1:]# the first letter refers to flowcell A or B
+            logging.debug('Infer flowcell id: {}'.format(self.fcid))
+
+    def infer_read_length(self):
+        """extract sequenced read length from runparameter.xml"""
+        # already known, do nothing
+        if self.read_1_len > 0:
+            return None
+        # default setting for novaseq
+        # run parameter file
+        run_para_file = '{}/RunParameters.xml'.format(self.run_folder)
+        if self.platform == 'hiseq':
+            run_para_file = '{}/runParameters.xml'.format(self.run_folder)
+        # read length labels
+        r1id = 'Read1NumberOfCycles'
+        r2id = 'Read2NumberOfCycles'
+        i1id = 'IndexRead1NumberOfCycles'
+        i2id = 'IndexRead2NumberOfCycles'
+        if self.platform == 'hiseq':
+            r1id = 'Read1'
+            r2id = 'Read2'
+            i1id = 'IndexRead1'
+            i2id = 'IndexRead2'
+        elif self.platform == 'nextseq500':
+            r1id = 'Read1'
+            r2id = 'Read2'
+            i1id = 'Index1Read'
+            i2id = 'Index2Read'
+        elif self.platform == 'nextseq2000':
+            r1id = 'Read1'
+            r2id = 'Read2'
+            i1id = 'Index1'
+            i2id = 'Index2'
+        # run parameter file exists?
+        if not os.path.exists(run_para_file):
+            logging.error('Unable to read the run parameter file: {}'.format(run_para_file))
+            sys.exit(7)
+        # parse xml file
+        tree = ET.parse(run_para_file)
+        # get root
+        root = tree.getroot()
+        # extract read length info
+        for x in root.iter(r1id):
+            self.read_1_len = int(x.text)
+        for x in root.iter(r2id):
+            self.read_2_len = int(x.text)
+        for x in root.iter(i1id):
+            self.index_1_len = int(x.text)
+        for x in root.iter(i2id):
+            self.index_2_len = int(x.text)
+        # do we have length for all reads?
+        if self.read_1_len == -1:
+            logging.error('Failed to get read 1 length.')
+            sys.exit(8)
+        if self.read_2_len == -1:
+            logging.error('Failed to get read 2 length.')
+            sys.exit(9)
+        if self.index_1_len == -1:
+            logging.error('Failed to get index 1 length.')
+            sys.exit(10)
+        if self.index_2_len == -1:
+            logging.error('Failed to get index 2 length.')
+            sys.exit(11)
+        logging.debug('Infer read 1 length: {}'.format(self.read_1_len))
+        logging.debug('Infer read 2 length: {}'.format(self.read_2_len))
+        logging.debug('Infer index 1 length: {}'.format(self.index_1_len))
+        logging.debug('Infer index 2 length: {}'.format(self.index_2_len))
+
+    def infer_seq_type(self):
+        """infer sequencing type based on read length"""
+        if self.seqtype is None:
+            if self.read_2_len > 0:
+                self.seqtype = 'PE'
+            else:
+                self.seqtype = 'SR'
+            logging.debug('Infer sequencing type: {}'.format(self.seqtype))
+
+    def extract_demux_units(self):
+        """extract demux information for each project"""
+        # screen for fastq folders under run folder
+        # assume fastq stored under folder named 'Unaligned', but not necessarily directly under it (e.g. 10X runs)
+        candidate_folders = [x for x in listdir(self.run_folder) if search('Unaligned',x)]
+        # scan for folders containing fastq files (demux unit)
+        temp_folders = []
+        for folder in candidate_folders:
+            for root, directories, files in walk(os.path.join(self.run_folder, folder)):
+                for tfile in files:
+                    if search('\.fastq\.gz$', tfile) and not search('^Undetermined_', tfile):
+                        # there are cases where fastq files were saved in a separate folder per sample
+                        if not search('.*?\-.*?\-\d+', os.path.basename(root)):
+                            temp_folders.append(os.path.dirname(root))
+                        else:
+                            temp_folders.append(root)
+                        break
+        fastq_folders = list(set(temp_folders))
+        #logging.debug('\n'.join(fastq_folders))
+        # process each demux unit and store it as a MyDemuxUnit object
+        for folder in fastq_folders:
+            tunit = MyDemuxUnit(folder, self.fcid)
+            tunit.infer_all()
+            self.units.append(tunit)
+
+    def prepare_table(self):
+        """combine information into a dataframe table"""
+        # merge information from each demux unit
+        mytable = pd.concat([x.prepare_table() for x in self.units])
+        # add additional information
+        # platform
+        mytable.insert(2, 'platform', [self.platform] * mytable.shape[0])
+        # flowcell id
+        mytable.insert(3, 'flowcell_id', [self.fcid] * mytable.shape[0])
+        # sequencing date
+        mytable.insert(4, 'date', [self.date] * mytable.shape[0])
+        mytable['date'] = pd.to_datetime(mytable['date'], format="%Y-%m-%d")
+        # run sequencing type
+        mytable.insert(mytable.shape[1], 'run_seqtype', [self.seqtype] * mytable.shape[0])
+        # run read length
+        mytable.insert(mytable.shape[1], 'run_read1len', [self.read_1_len] * mytable.shape[0])
+        mytable.insert(mytable.shape[1], 'run_read2len', [self.read_2_len] * mytable.shape[0])
+        mytable.insert(mytable.shape[1], 'run_index1len', [self.index_1_len] * mytable.shape[0])
+        mytable.insert(mytable.shape[1], 'run_index2len', [self.index_2_len] * mytable.shape[0])
+        #logging.debug(mytable.shape)
+        #logging.debug(mytable.head(2))
+        return mytable
+
+    def to_file(self, outfile):
+        """combine information and write to file"""
+        # combine information into a table
+        mytable = self.prepare_table()
+        # write to file
+        if search('\.xlsx$', outfile):
+            mytable.to_excel(outfile, index=False)
+        elif search('\.csv$', outfile):
+            mytable.to_csv(outfile, sep=',', index=False)
+        elif search('\.tsv$|\.txt$', outfile):
+            mytable.to_csv(outfile, sep='\t', index=False)
+        else:
+            logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+        logging.info('write MyDemuxRun to file: {}'.format(outfile))
+
+    def __repr__(self):
+        """print info for a demux run"""
+        to_print = []
+        to_print.append('run folder: {}'.format(self.run_folder))
+        to_print.append('platform: {}'.format(self.platform))
+        to_print.append('flowcell id: {}'.format(self.fcid))
+        to_print.append('date: {}'.format(self.date))
+        to_print.append('sequence type: {}'.format(self.seqtype))
+        to_print.append('read 1 length: {}'.format(self.read_1_len))
+        to_print.append('read 2 length: {}'.format(self.read_2_len))
+        to_print.append('index 1 length: {}'.format(self.index_1_len))
+        to_print.append('index 2 length: {}'.format(self.index_2_len))
+        return '\n'.join(to_print)
 
 # functions
-def main():
-    du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_1/Guzman-NMT-11319_2021_10_15','HL5G2DSX2')
+def test_MyDemuxUnit():
+    #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_1/Guzman-NMT-11319_2021_10_15','HL5G2DSX2')
+    du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
     du.infer_ilab()
     du.infer_report_file()
     du.infer_seq_type()
@@ -168,6 +394,26 @@ def main():
     du.to_file('/tmp/test.txt')
     print(du)
     #print(du.summary.columns)
+
+def test_MyDemuxRun():
+    #dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
+    dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
+    dr.infer_platform()
+    dr.infer_seq_date()
+    dr.infer_flowcell_id()
+    dr.infer_read_length()
+    dr.infer_seq_type()
+    dr.extract_demux_units()
+    dr.prepare_table()
+    dr.to_file('/tmp/test.run.txt')
+    print(dr)
+    #print(len(dr.units))
+    #print(dr.units[0])
+
+def main():
+    logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+    #test_MyDemuxUnit()
+    test_MyDemuxRun()
 
 # main
 if __name__ == '__main__':
