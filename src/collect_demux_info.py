@@ -128,7 +128,7 @@ class MyDemuxUnit:
                 self.summary = sumtables[0]
             # replace 'Sample_' in the sample name
             self.summary['Sample'] = self.summary['Sample'].astype('str')
-            self.summary['Sample'] = self.summary['Sample'].str.replace('^Sample_','')
+            self.summary['Sample'] = self.summary['Sample'].str.replace(r'^Sample_','',regex=True)
 
     def infer_all(self):
         """infer all available information"""
@@ -331,6 +331,15 @@ class MyDemuxRun:
             tunit.infer_all()
             self.units.append(tunit)
 
+    def infer_all(self):
+        """infer all available information"""
+        self.infer_platform()
+        self.infer_seq_date()
+        self.infer_flowcell_id()
+        self.infer_read_length()
+        self.infer_seq_type()
+        self.extract_demux_units()
+
     def prepare_table(self):
         """combine information into a dataframe table"""
         # merge information from each demux unit
@@ -345,7 +354,7 @@ class MyDemuxRun:
         mytable['date'] = pd.to_datetime(mytable['date'], format="%Y-%m-%d")
         # run sequencing type
         mytable.insert(mytable.shape[1], 'run_seqtype', [self.seqtype] * mytable.shape[0])
-        # run read length
+e       # run read length
         mytable.insert(mytable.shape[1], 'run_read1len', [self.read_1_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_read2len', [self.read_2_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_index1len', [self.index_1_len] * mytable.shape[0])
@@ -387,24 +396,26 @@ class MyDemuxRun:
 def test_MyDemuxUnit():
     #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_1/Guzman-NMT-11319_2021_10_15','HL5G2DSX2')
     du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
-    du.infer_ilab()
-    du.infer_report_file()
-    du.infer_seq_type()
-    du.load_report()
+    #du.infer_ilab()
+    #du.infer_report_file()
+    #du.infer_seq_type()
+    #du.load_report()
+    du.infer_all()
     du.to_file('/tmp/test.txt')
     print(du)
     #print(du.summary.columns)
 
 def test_MyDemuxRun():
-    #dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
-    dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
-    dr.infer_platform()
-    dr.infer_seq_date()
-    dr.infer_flowcell_id()
-    dr.infer_read_length()
-    dr.infer_seq_type()
-    dr.extract_demux_units()
-    dr.prepare_table()
+    dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
+    #dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
+    #dr.infer_platform()
+    #dr.infer_seq_date()
+    #dr.infer_flowcell_id()
+    #dr.infer_read_length()
+    #dr.infer_seq_type()
+    #dr.extract_demux_units()
+    #dr.prepare_table()
+    dr.infer_all()
     dr.to_file('/tmp/test.run.txt')
     print(dr)
     #print(len(dr.units))
