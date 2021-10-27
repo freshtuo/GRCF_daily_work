@@ -47,6 +47,8 @@ class MyDemuxUnit:
         self.read_2_len = read_2_len
         # columns to include
         self.columns = ['Sample','Barcode sequence', 'PF Clusters', 'Yield (Mbases)', '% >= Q30bases']
+        # a valid demux unit for output?
+        self.valid = True
 
     def infer_ilab(self):
         """guest iLab id and project name"""
@@ -66,13 +68,24 @@ class MyDemuxUnit:
         if self.report_file is None:
             # the 'Reports' folder should be in the same level as the fastq folder and 
             # they share the same parent folder, not necessarily named 'Unaligned' (e.g. 10X runs)
-            tfolders = self.fastq_folder.split('/')
+            tbasefolder = os.path.dirname(self.fastq_folder)
+            # get project folder
+            # e.g. Nam-SR-11103_2021_09_01_part2 --> Nam-SR-11103
+            #      Nam-SR-11103 (before data distribution, no need to change)
+            tpjtfolder = os.path.basename(self.fastq_folder)
+            tpat = search('^(.*?)_\d+_\d+_\d+', tpjtfolder)
+            if tpat:
+                tpjtfolder = tpat.groups()[0]
+            # eg. Nam-SR-11103_2021_09_01_part2
             # guess report html file
-            tsumfile = '/'.join(tfolders[:-1]+['Reports','html',self.fcid,tfolders[-1].split('_')[0],'all','all','laneBarcode.html'])
+            tsumfile = os.path.join(tbasefolder,'Reports','html',self.fcid,tpjtfolder,'all','all','laneBarcode.html')
             # check file existence
             if os.path.exists(tsumfile):
                 self.report_file = tsumfile
                 logging.debug('Infer demux report html file: {}'.format(self.report_file))
+            else:
+                self.valid = False
+                logging.warning('Failed to locate demux report html file: {}'.format(tsumfile))
 
     def guess_read_length(self, fastq_file, num_reads=100):
         """guess read length for a given fastq file"""
@@ -139,6 +152,10 @@ class MyDemuxUnit:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
+        # a valid demux unit?
+        if not self.valid:
+            logging.warning('Not a valid demux project: {}'.format(self.fastq_folder))
+            return None
         # get a copy of summary for output purpose
         mytable = self.summary[self.columns].copy()
         # add other information
@@ -151,6 +168,10 @@ class MyDemuxUnit:
 
     def to_file(self, outfile):
         """combine information and write to file"""
+        # a valid demux unit?
+        if not self.valid:
+            logging.warning('Not a valid demux project: {}'.format(self.fastq_folder))
+            return None
         # combine information into a table
         mytable = self.prepare_table()
         # write to file
@@ -175,6 +196,7 @@ class MyDemuxUnit:
         to_print.append('sequence type: {}'.format(self.seqtype))
         to_print.append('read 1 length: {}'.format(self.read_1_len))
         to_print.append('read 2 length: {}'.format(self.read_2_len))
+        to_print.append('valid?: {}'.format(self.valid))
         return '\n'.join(to_print)
 
 # MyDemuxRun: a sequencing run
@@ -200,6 +222,8 @@ class MyDemuxRun:
         self.index_2_len = index_2_len
         # projects in this run
         self.units = []
+        # a valid demux run for output?
+        self.valid = True
 
     def infer_platform(self):
         """infer platform from run folder"""
@@ -327,9 +351,15 @@ class MyDemuxRun:
         #logging.debug('\n'.join(fastq_folders))
         # process each demux unit and store it as a MyDemuxUnit object
         for folder in fastq_folders:
+            logging.debug(folder)
             tunit = MyDemuxUnit(folder, self.fcid)
             tunit.infer_all()
-            self.units.append(tunit)
+            if tunit.valid:
+                self.units.append(tunit)
+        # at least one valid unit collected?
+        if not self.units:
+            logging.warning('Not a valid demux run: {}'.format(self.run_folder))
+            self.valid = False
 
     def infer_all(self):
         """infer all available information"""
@@ -342,6 +372,9 @@ class MyDemuxRun:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
+        # a valid demux run?
+        if not self.valid:
+            return None
         # merge information from each demux unit
         mytable = pd.concat([x.prepare_table() for x in self.units])
         # add additional information
@@ -354,7 +387,7 @@ class MyDemuxRun:
         mytable['date'] = pd.to_datetime(mytable['date'], format="%Y-%m-%d")
         # run sequencing type
         mytable.insert(mytable.shape[1], 'run_seqtype', [self.seqtype] * mytable.shape[0])
-e       # run read length
+        # run read length
         mytable.insert(mytable.shape[1], 'run_read1len', [self.read_1_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_read2len', [self.read_2_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_index1len', [self.index_1_len] * mytable.shape[0])
@@ -365,6 +398,9 @@ e       # run read length
 
     def to_file(self, outfile):
         """combine information and write to file"""
+        # a valid demux run?
+        if not self.valid:
+            return None
         # combine information into a table
         mytable = self.prepare_table()
         # write to file
@@ -390,6 +426,77 @@ e       # run read length
         to_print.append('read 2 length: {}'.format(self.read_2_len))
         to_print.append('index 1 length: {}'.format(self.index_1_len))
         to_print.append('index 2 length: {}'.format(self.index_2_len))
+        to_print.append('# demux units: {}'.format(len(self.units)))
+        to_print.append('valid?: {}'.format(self.valid))
+        return '\n'.join(to_print)
+
+# MyDemuxFolder: a folder under which multiple sequencing runs lie
+class MyDemuxFolder:
+    """Class for saving info of runs under a given folder"""
+
+    def __init__(self, server_folder):
+        """class constructor"""
+        # server folder
+        self.server_folder = server_folder
+        # sequencing runs inside this folder
+        self.runs = []
+        # a valid demux folder for output?
+        self.valid = True
+
+    def extract_demux_runs(self):
+        """extract demux information for all available runs inside the folder"""
+        logging.info(self.server_folder)
+        # screen for all available sequencing runs
+        # e.g. 210901_A00814_0481_AHJ5T2DRXY
+        run_folders = [x for x in listdir(self.server_folder) if search('\d+_[A-Z\d]+_\d+_[A-Za-z\d]+',x)]
+        # process each demux run folder and store it as a MyDemuxRun object
+        for folder in run_folders:
+            logging.info(folder)
+            trun = MyDemuxRun(os.path.join(self.server_folder,folder))
+            trun.infer_all()
+            if trun.valid:
+                self.runs.append(trun)
+            #logging.info(trun)
+        # at least one valid demux run?
+        if not self.runs:
+            logging.warning('Not a valid demux folder: {}'.format(self.server_folder))
+            self.valid = False
+
+    def prepare_table(self):
+        """combine information into a dataframe table"""
+        # a valid demux folder?
+        if not self.valid:
+            return None
+        # merge information from each demux run
+        mytable = pd.concat([x.prepare_table() for x in self.runs])
+        #logging.debug(mytable.shape)
+        #logging.debug(mytable.head(2))
+        return mytable
+
+    def to_file(self, outfile):
+        """combine information and write to file"""
+        # a valid demux run?
+        if not self.valid:
+            return None
+        # combine information into a table
+        mytable = self.prepare_table()
+        # write to file
+        if search('\.xlsx$', outfile):
+            mytable.to_excel(outfile, index=False)
+        elif search('\.csv$', outfile):
+            mytable.to_csv(outfile, sep=',', index=False)
+        elif search('\.tsv$|\.txt$', outfile):
+            mytable.to_csv(outfile, sep='\t', index=False)
+        else:
+            logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+        logging.info('write MyDemuxRun to file: {}'.format(outfile))
+
+    def __repr__(self):
+        """print info for a demux run"""
+        to_print = []
+        to_print.append('server folder: {}'.format(self.server_folder))
+        to_print.append('# demux runs: {}'.format(len(self.runs)))
+        to_print.append('valid?: {}'.format(self.valid))
         return '\n'.join(to_print)
 
 # functions
@@ -421,10 +528,20 @@ def test_MyDemuxRun():
     #print(len(dr.units))
     #print(dr.units[0])
 
+def test_MyDemuxFolder():
+    df = MyDemuxFolder('/scratch/seq_data/NovaSeq6000')
+    #print(df.server_folder)
+    df.extract_demux_runs()
+    df.prepare_table()
+    df.to_file('/tmp/test.folder.txt')
+    print(df)
+
 def main():
-    logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+    #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     #test_MyDemuxUnit()
-    test_MyDemuxRun()
+    #test_MyDemuxRun()
+    test_MyDemuxFolder()
 
 # main
 if __name__ == '__main__':
