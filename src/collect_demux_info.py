@@ -54,13 +54,16 @@ class MyDemuxUnit:
         """guest iLab id and project name"""
         # eg: Loda-MJ-10557_2021_06_15 or Diaz-Meco-MADM-10830_2021_07_19
         if self.ilab is None:
-            folder_name = self.fastq_folder.split('/')[-1]
+            folder_name = os.path.basename(self.fastq_folder)
             tmatches = findall('(\d+)', folder_name)
             if tmatches:
                 self.ilab = int(tmatches[0])
                 self.project = folder_name[:folder_name.find(tmatches[0])-1]
                 logging.debug('Infer iLab id: {}'.format(self.ilab))
                 logging.debug('Infer PI info: {}'.format(self.project))
+            else:
+                self.valid = False
+                logging.warning('Failed to infer iLab id: {}'.format(self.fastq_folder))
 
     def infer_report_file(self):
         """guess demux report html file if not provided"""
@@ -136,9 +139,14 @@ class MyDemuxUnit:
             sumtables = pd.read_html(self.report_file, match='Sample')
             # double check on detected tables
             if len(sumtables) != 1:
-                logging.warning("More than one table with 'Sample' column detected in demux summary file {}".format(self.report_file))
+                logging.warning("More than one table with 'Sample' column detected in demux summary file {}. Use the first table.".format(self.report_file))
             else:
                 self.summary = sumtables[0]
+            # double check if all required columns exist
+            for col in self.columns:
+                if col not in self.summary.columns:
+                    self.valid = False
+                    logging.warning("Column '{}' cannot be found in the demux summary file {}.".format(col, self.report_file))
             # replace 'Sample_' in the sample name
             self.summary['Sample'] = self.summary['Sample'].astype('str')
             self.summary['Sample'] = self.summary['Sample'].str.replace(r'^Sample_','',regex=True)
@@ -183,6 +191,7 @@ class MyDemuxUnit:
             mytable.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+            return None
         logging.info('write MyDemuxUnit to file: {}'.format(outfile))
 
     def __repr__(self):
@@ -237,16 +246,34 @@ class MyDemuxRun:
             elif 'novaseq' in self.run_folder.lower():
                 self.platform = 'novaseq'
             else:
-                logging.error('Failed to infer platform for {}'.format(self.platform))
-                sys.exit(7)
+                self.valid = False
+                logging.warning('Failed to infer platform for {}'.format(self.platform))
             logging.debug('Infer platform: {}'.format(self.platform))
+
+    def verify_seq_date(self, date):
+        """a date (e.g. 201208) is valid?"""
+        # include non-numeric characters?
+        if search('\D+', date):
+            return False
+        # month
+        if date[2] not in ['0','1']:
+            return False
+        # day
+        if date[4] not in ['0','1','2','3']:
+            return False
+        return True
 
     def infer_seq_date(self):
         """guess date of sequencing"""
         if self.date is None:
             tdate = os.path.basename(self.run_folder).split('_')[0]
-            self.date = '20{}-{}-{}'.format(tdate[:2],tdate[2:4],tdate[4:])
-            logging.debug('Infer sequencing date: {}'.format(self.date))
+            # double check on date, make sure it is a valid date
+            if not self.verify_seq_date(tdate):
+                self.valid = False
+                logging.warning('Failed to infer sequencing date for {}'.format(self.run_folder))
+            else:
+                self.date = '20{}-{}-{}'.format(tdate[:2],tdate[2:4],tdate[4:])
+                logging.debug('Infer sequencing date: {}'.format(self.date))
 
     def infer_flowcell_id(self):
         """guess flowcell id"""
@@ -288,8 +315,9 @@ class MyDemuxRun:
             i2id = 'Index2'
         # run parameter file exists?
         if not os.path.exists(run_para_file):
-            logging.error('Unable to read the run parameter file: {}'.format(run_para_file))
-            sys.exit(7)
+            self.valid = False
+            logging.warning('Unable to read the run parameter file: {}'.format(run_para_file))
+            return None
         # parse xml file
         tree = ET.parse(run_para_file)
         # get root
@@ -305,21 +333,22 @@ class MyDemuxRun:
             self.index_2_len = int(x.text)
         # do we have length for all reads?
         if self.read_1_len == -1:
-            logging.error('Failed to get read 1 length.')
-            sys.exit(8)
-        if self.read_2_len == -1:
-            logging.error('Failed to get read 2 length.')
-            sys.exit(9)
-        if self.index_1_len == -1:
-            logging.error('Failed to get index 1 length.')
-            sys.exit(10)
-        if self.index_2_len == -1:
-            logging.error('Failed to get index 2 length.')
-            sys.exit(11)
-        logging.debug('Infer read 1 length: {}'.format(self.read_1_len))
-        logging.debug('Infer read 2 length: {}'.format(self.read_2_len))
-        logging.debug('Infer index 1 length: {}'.format(self.index_1_len))
-        logging.debug('Infer index 2 length: {}'.format(self.index_2_len))
+            self.valid = False
+            logging.warning('Failed to get read 1 length.')
+        elif self.read_2_len == -1:
+            self.valid = False
+            logging.warning('Failed to get read 2 length.')
+        elif self.index_1_len == -1:
+            self.valid = False
+            logging.warning('Failed to get index 1 length.')
+        elif self.index_2_len == -1:
+            self.valid = False
+            logging.warning('Failed to get index 2 length.')
+        else:
+            logging.debug('Infer read 1 length: {}'.format(self.read_1_len))
+            logging.debug('Infer read 2 length: {}'.format(self.read_2_len))
+            logging.debug('Infer index 1 length: {}'.format(self.index_1_len))
+            logging.debug('Infer index 2 length: {}'.format(self.index_2_len))
 
     def infer_seq_type(self):
         """infer sequencing type based on read length"""
@@ -358,8 +387,8 @@ class MyDemuxRun:
                 self.units.append(tunit)
         # at least one valid unit collected?
         if not self.units:
-            logging.warning('Not a valid demux run: {}'.format(self.run_folder))
             self.valid = False
+            logging.warning('Not a valid demux run since no valid units (projects) are found: {}'.format(self.run_folder))
 
     def infer_all(self):
         """infer all available information"""
@@ -412,6 +441,7 @@ class MyDemuxRun:
             mytable.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+            return None
         logging.info('write MyDemuxRun to file: {}'.format(outfile))
 
     def __repr__(self):
@@ -456,11 +486,11 @@ class MyDemuxFolder:
             trun.infer_all()
             if trun.valid:
                 self.runs.append(trun)
-            #logging.info(trun)
+            #logging.debug(trun)
         # at least one valid demux run?
         if not self.runs:
-            logging.warning('Not a valid demux folder: {}'.format(self.server_folder))
             self.valid = False
+            logging.warning('Not a valid demux folder since no valid runs are found: {}'.format(self.server_folder))
 
     def prepare_table(self):
         """combine information into a dataframe table"""
@@ -489,6 +519,7 @@ class MyDemuxFolder:
             mytable.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+            return None
         logging.info('write MyDemuxRun to file: {}'.format(outfile))
 
     def __repr__(self):
