@@ -490,13 +490,13 @@ class MyDemuxFolder:
 
     def extract_demux_runs(self):
         """extract demux information for all available runs inside the folder"""
-        logging.info(self.server_folder)
+        logging.info('[Folder]\t{}'.format(self.server_folder))
         # screen for all available sequencing runs
         # e.g. 210901_A00814_0481_AHJ5T2DRXY
         run_folders = [x for x in listdir(self.server_folder) if search('\d+_[A-Z\d]+_\d+_[A-Za-z\d]+',x)]
         # process each demux run folder and store it as a MyDemuxRun object
         for folder in run_folders:
-            logging.info(folder)
+            logging.info('[Run]\t{}'.format(folder))
             trun = MyDemuxRun(os.path.join(self.server_folder,folder))
             trun.infer_all()
             if trun.valid:
@@ -654,7 +654,23 @@ def test_MyDemuxAuto():
 
 def main():
     #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    #logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    
+    # prepare loggings
+    log_formatter = logging.Formatter('%(levelname)s: %(message)s')
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # logging to file
+    file_handler = logging.FileHandler('/tmp/test.auto.log')
+    file_handler.setFormatter(log_formatter)
+    root_logger.addHandler(file_handler)
+
+    # logging to stdout
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(log_formatter)
+    root_logger.addHandler(console_handler)
+
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
     #test_MyDemuxFolder()
