@@ -55,18 +55,25 @@ class MyDemuxUnit:
         # eg: Loda-MJ-10557_2021_06_15
         #     Diaz-Meco-MADM-10830_2021_07_19
         #     Delia
-        if self.ilab is None:
+        #     Delia_2021_10_15
+        if self.ilab == -1:
             folder_name = os.path.basename(self.fastq_folder)
-            tmatches = findall('(\d+)', folder_name)
-            if tmatches:
-                self.ilab = int(tmatches[0])
-                self.project = folder_name[:folder_name.find(tmatches[0])-1]
+            tmatches_A = findall('(\d+)', folder_name)
+            tmatches_B = search('(.*?)_\d+_\d+_\d+', folder_name)
+            if tmatches_A:
+                self.ilab = int(tmatches_A[0])
+                self.project = folder_name[:folder_name.find(tmatches_A[0])-1]
                 logging.debug('Infer iLab id: {}'.format(self.ilab))
-                logging.debug('Infer PI info: {}'.format(self.project))
+                logging.debug('Infer project info: {}'.format(self.project))
             else:
-                # some project does not have a iLab id, so leave it as '-1'
+                # some project does not have a iLab id, so leave it as '-1' while still keep this project
                 ###self.valid = False
+                # get project name
+                self.project = folder_name
+                if tmatches_B:
+                    self.project = tmatches_B.groups()[0]
                 logging.warning('Failed to infer iLab id: {}'.format(self.fastq_folder))
+                logging.debug('Infer project info: {}'.format(self.project))
 
     def infer_report_file(self):
         """guess demux report html file if not provided"""
