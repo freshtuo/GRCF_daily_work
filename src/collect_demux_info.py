@@ -505,7 +505,7 @@ class MyDemuxFolder:
 
     def to_file(self, outfile):
         """combine information and write to file"""
-        # a valid demux run?
+        # a valid demux folder?
         if not self.valid:
             return None
         # combine information into a table
@@ -520,13 +520,76 @@ class MyDemuxFolder:
         else:
             logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
             return None
-        logging.info('write MyDemuxRun to file: {}'.format(outfile))
+        logging.info('write MyDemuxFolder to file: {}'.format(outfile))
 
     def __repr__(self):
-        """print info for a demux run"""
+        """print info for a demux folder"""
         to_print = []
         to_print.append('server folder: {}'.format(self.server_folder))
         to_print.append('# demux runs: {}'.format(len(self.runs)))
+        to_print.append('valid?: {}'.format(self.valid))
+        return '\n'.join(to_print)
+
+# MyDemuxAuto: automatically screen multiple folders and collect demux info
+class MyDemuxAuto:
+    """Class for saving info on multiple server locations"""
+
+    def __init__(self, server_folder_list):
+        """class constructor"""
+        # a list of server folders to screen
+        self.server_folder_list = server_folder_list
+        # demux info for all available server folders
+        self.folders = []
+        # a valid demux auto for output?
+        self.valid = True
+
+    def extract_demux_folders(self):
+        """extract demux information for all available folders in the list"""
+        for folder in self.server_folder_list:
+            tfolder = MyDemuxFolder(folder)
+            tfolder.extract_demux_runs()
+            if tfolder.valid:
+                self.folders.append(tfolder)
+            #logging.debug(tfolder)
+        # at least one valid demux folder?
+        if not self.folders:
+            self.valid = False
+            logging.warning('Not a valid demux auto since no valid folders are found: \n{}'.format('\n'.join(self.server_folder_list)))
+
+    def prepare_table(self):
+        """combine information into a dataframe table"""
+        # a valid demux auto?
+        if not self.valid:
+            return None
+        # merge information from all demux folders
+        mytable = pd.concat([x.prepare_table() for x in self.folders])
+        #logging.debug(mytable.shape)
+        #logging.debug(mytable.head(2))
+        return mytable
+
+    def to_file(self, outfile):
+        """combine information and write to file"""
+        # a valid demux auto?
+        if not self.valid:
+            return None
+        # combine information into a table
+        mytable = self.prepare_table()
+        # write to file
+        if search('\.xlsx$', outfile):
+            mytable.to_excel(outfile, index=False)
+        elif search('\.csv$', outfile):
+            mytable.to_csv(outfile, sep=',', index=False)
+        elif search('\.tsv$|\.txt$', outfile):
+            mytable.to_csv(outfile, sep='\t', index=False)
+        else:
+            logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+            return None
+        logging.info('write MyDemuxAuto to file: {}'.format(outfile))
+
+    def __repr__(self):
+        """print info for a demux auto"""
+        to_print = []
+        to_print.append('# demux folders: {}'.format(len(self.folders)))
         to_print.append('valid?: {}'.format(self.valid))
         return '\n'.join(to_print)
 
@@ -567,12 +630,20 @@ def test_MyDemuxFolder():
     df.to_file('/tmp/test.folder.txt')
     print(df)
 
+def test_MyDemuxAuto():
+    da = MyDemuxAuto(['/scratch/seq_data/NovaSeq6000','/data/seq/NovaSeq6000'])
+    #print(da.server_folder_list)
+    da.extract_demux_folders()
+    da.prepare_table()
+    da.to_file('/tmp/test.auto.txt')
+
 def main():
     #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
-    test_MyDemuxFolder()
+    #test_MyDemuxFolder()
+    test_MyDemuxAuto()
 
 # main
 if __name__ == '__main__':
