@@ -154,6 +154,10 @@ class MyDemuxUnit:
             # replace 'Sample_' in the sample name
             self.summary['Sample'] = self.summary['Sample'].astype('str')
             self.summary['Sample'] = self.summary['Sample'].str.replace(r'^Sample_','',regex=True)
+            # remove any Sample == 'Undetermined' & Barcode sequence == 'unknown'
+            filt1 = self.summary['Sample'] == 'Undetermined'
+            filt2 = self.summary['Barcode sequence'] != 'unknown'
+            self.summary = self.summary[~ (filt1 & filt2)]
 
     def infer_all(self):
         """infer all available information"""
