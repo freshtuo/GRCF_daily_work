@@ -26,7 +26,7 @@ from argparse import ArgumentDefaultsHelpFormatter
 class MyDemuxUnit:
     """Class for saving info of a single demux unit"""
 
-    def __init__(self, fastq_folder, flowcell_id, report_file=None, ilab=None, project=None, seqtype=None, read_1_len=-1, read_2_len=-1):
+    def __init__(self, fastq_folder, flowcell_id, report_file=None, ilab=-1, project=None, seqtype=None, read_1_len=-1, read_2_len=-1):
         """class constructor"""
         # fastq data folder
         self.fastq_folder = fastq_folder
@@ -52,7 +52,9 @@ class MyDemuxUnit:
 
     def infer_ilab(self):
         """guest iLab id and project name"""
-        # eg: Loda-MJ-10557_2021_06_15 or Diaz-Meco-MADM-10830_2021_07_19
+        # eg: Loda-MJ-10557_2021_06_15
+        #     Diaz-Meco-MADM-10830_2021_07_19
+        #     Delia
         if self.ilab is None:
             folder_name = os.path.basename(self.fastq_folder)
             tmatches = findall('(\d+)', folder_name)
@@ -62,7 +64,8 @@ class MyDemuxUnit:
                 logging.debug('Infer iLab id: {}'.format(self.ilab))
                 logging.debug('Infer PI info: {}'.format(self.project))
             else:
-                self.valid = False
+                # some project does not have a iLab id, so leave it as '-1'
+                ###self.valid = False
                 logging.warning('Failed to infer iLab id: {}'.format(self.fastq_folder))
 
     def infer_report_file(self):
@@ -75,6 +78,7 @@ class MyDemuxUnit:
             # get project folder
             # e.g. Nam-SR-11103_2021_09_01_part2 --> Nam-SR-11103
             #      Nam-SR-11103 (before data distribution, no need to change)
+            #      Delia (no need to change)
             tpjtfolder = os.path.basename(self.fastq_folder)
             tpat = search('^(.*?)_\d+_\d+_\d+', tpjtfolder)
             if tpat:
