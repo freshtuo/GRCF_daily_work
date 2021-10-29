@@ -623,7 +623,7 @@ class MyDemuxAuto:
         # output file
         outfile = os.path.join(outdir, '{}.{}.xlsx'.format(outprefix, mydf['year'].iloc[0]))
         # open an excel file handler and write to it
-        with pd.ExcelWriter(outfile) as writer:
+        with pd.ExcelWriter(outfile, datetime_format='mmm d, yyyy') as writer:
             # overview table
             overview.to_excel(writer, sheet_name='overview', index=False)
             # per-month information table
@@ -724,17 +724,16 @@ def test_MyDemuxAuto():
     #print(da.server_folder_list)
     da.extract_demux_folders()
     da.prepare_table()
-    #da.to_file('/tmp','test.auto','xlsx')
-    da.to_file('/tmp','test.auto','txt')
+    da.to_file('/tmp','test.auto','xlsx')
+    #da.to_file('/tmp','test.auto','txt')
     #da.to_excel('/tmp','test.auto')
 
-def setup_logging(logfile):
+def setup_logging(logfile, level=logging.INFO):
     """set up logging"""
     # prepare loggings
     log_formatter = logging.Formatter('%(levelname)s: %(message)s')
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    #root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(level)
 
     # logging to file
     file_handler = logging.FileHandler('/tmp/test.auto.log')
@@ -753,7 +752,8 @@ def setup_logging(logfile):
 
 def main():
     # set up logging
-    root_logger = setup_logging('/tmp/test.auto.log')
+    root_logger = setup_logging('/tmp/test.auto.log', level=logging.INFO)
+    #root_logger = setup_logging('/tmp/test.auto.log', level=logging.DEBUG)
 
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
