@@ -46,7 +46,7 @@ class MyDemuxUnit:
         self.read_1_len = read_1_len
         self.read_2_len = read_2_len
         # columns to include
-        self.columns = ['Sample','Barcode sequence', 'PF Clusters', 'Yield (Mbases)', '% >= Q30bases']
+        self.columns = ['Sample','Barcode sequence','num_lanes','PF Clusters','Yield (Mbases)','% >= Q30bases']
         # a valid demux unit for output?
         self.valid = True
 
@@ -152,7 +152,14 @@ class MyDemuxUnit:
             if len(sumtables) != 1:
                 logging.warning("More than one table with 'Sample' column detected in demux summary file {}. Use the first table.".format(self.report_file))
             else:
-                self.summary = sumtables[0]
+                # use the first table
+                mytable = sumtables[0]
+                # merge reads from the same sample but different lanes
+                self.summary = mytable.groupby(['Sample','Barcode sequence'])\
+                    .agg(num_lanes=('PF Clusters','count'), PF_Clusters=('PF Clusters','sum'), Mbases=('Yield (Mbases)','sum'), Q30=('% >= Q30bases','mean'))\
+                    .reset_index()\
+                    .rename(columns={'PF_Clusters':'PF Clusters','Mbases':'Yield (Mbases)','Q30':'% >= Q30bases'})\
+                #logging.debug(self.summary.head())
             # double check if all required columns exist
             for col in self.columns:
                 if col not in self.summary.columns:
@@ -173,21 +180,6 @@ class MyDemuxUnit:
         self.infer_seq_type()
         self.load_report()
 
-    def dedup_records(self, mydf):
-        """de-duplicate records within one demux sample"""
-        # sometimes, one project may be demuxed several times, each time with different demux settings. 
-        # this function performes de-duplication such that one record is kept per sample based on the following criteria:
-        # 1) keep record with the highest number of reads
-        # 2) for multiple sequencing types: choose SR if it applies
-        # 3) for different read lengths, choose the short one
-
-        # categorize the 'seqtype' column
-        mydf['seqtype'] = pd.Categorical(mydf['seqtype'], ordered=True, categories=['SR','PE'])
-        # sort by reads, sequencing type and read lengths
-        mydf.sort_values(by=['PF Clusters','seqtype','read1len','read2len'], ascending=[False,True,True,True], inplace=True)
-        # dedup by choosing the first record
-        return mydf.drop_duplicates(subset=['Sample'], keep='first')
-
     def prepare_table(self):
         """combine information into a dataframe table"""
         # a valid demux unit?
@@ -202,8 +194,6 @@ class MyDemuxUnit:
         mytable.insert(2, 'seqtype', [self.seqtype] * mytable.shape[0])
         mytable.insert(3, 'read1len', [self.read_1_len] * mytable.shape[0])
         mytable.insert(4, 'read2len', [self.read_2_len] * mytable.shape[0])
-        # de-dupliate record by sample
-        mytable = mytable.groupby(by=['Sample']).apply(self.dedup_records)
         return mytable
 
     def to_file(self, outfile):
@@ -431,6 +421,21 @@ class MyDemuxRun:
         self.infer_seq_type()
         self.extract_demux_units()
 
+    def dedup_records(self, mydf):
+        """de-duplicate records within one demux run"""
+        # sometimes, one project may be demuxed several times, each time with different demux settings.
+        # this function performes de-duplication such that one record is kept per sample based on the following criteria:
+        # 1) keep record with the highest number of reads
+        # 2) for multiple sequencing types: choose SR if it applies
+        # 3) for different read lengths, choose the short one
+
+        # categorize the 'seqtype' column
+        mydf['seqtype'] = pd.Categorical(mydf['seqtype'], ordered=True, categories=['SR','PE'])
+        # sort by reads, sequencing type and read lengths
+        mydf.sort_values(by=['PF Clusters','seqtype','read1len','read2len'], ascending=[False,True,True,True], inplace=True)
+        # dedup by choosing the first record
+        return mydf.drop_duplicates(subset=['iLab','Sample'], keep='first')
+
     def prepare_table(self):
         """combine information into a dataframe table"""
         # a valid demux run?
@@ -453,6 +458,8 @@ class MyDemuxRun:
         mytable.insert(mytable.shape[1], 'run_read2len', [self.read_2_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_index1len', [self.index_1_len] * mytable.shape[0])
         mytable.insert(mytable.shape[1], 'run_index2len', [self.index_2_len] * mytable.shape[0])
+        # de-dupliate record by sample
+        mytable = self.dedup_records(mytable)
         #logging.debug(mytable.shape)
         #logging.debug(mytable.head(2))
         return mytable
@@ -573,7 +580,9 @@ class MyDemuxAuto:
         # demux info for all available server folders
         self.folders = []
         # columns to include
-        self.columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len','Sample','Barcode sequence','PF Clusters','Yield (Mbases)','% >= Q30bases','run_seqtype','run_read1len','run_read2len','run_index1len','run_index2len']
+        self.columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len',\
+            'Sample','Barcode sequence','num_lanes','PF Clusters','Yield (Mbases)','% >= Q30bases',\
+            'run_seqtype','run_read1len','run_read2len','run_index1len','run_index2len']
         # month abbr.
         self.months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
         # a valid demux auto for output?
@@ -599,6 +608,8 @@ class MyDemuxAuto:
             return None
         # merge information from all demux folders
         mytable = pd.concat([x.prepare_table() for x in self.folders])
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         #logging.debug(mytable.shape)
         #logging.debug(mytable.head(2))
         return mytable
@@ -672,7 +683,8 @@ class MyDemuxAuto:
 # functions
 def test_MyDemuxUnit():
     #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_1/Guzman-NMT-11319_2021_10_15','HL5G2DSX2')
-    du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
+    #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
+    du = MyDemuxUnit('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX/Unaligned_1/Landau-RC-8951_2020_06_25','HMNKGDRXX')
     #du.infer_ilab()
     #du.infer_report_file()
     #du.infer_seq_type()
@@ -683,8 +695,9 @@ def test_MyDemuxUnit():
     #print(du.summary.columns)
 
 def test_MyDemuxRun():
-    dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
+    #dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
     #dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
+    dr = MyDemuxRun('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX')
     #dr.infer_platform()
     #dr.infer_seq_date()
     #dr.infer_flowcell_id()
@@ -721,6 +734,7 @@ def setup_logging(logfile):
     log_formatter = logging.Formatter('%(levelname)s: %(message)s')
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
+    #root_logger.setLevel(logging.DEBUG)
 
     # logging to file
     file_handler = logging.FileHandler('/tmp/test.auto.log')
