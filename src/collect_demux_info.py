@@ -173,6 +173,21 @@ class MyDemuxUnit:
         self.infer_seq_type()
         self.load_report()
 
+    def dedup_records(self, mydf):
+        """de-duplicate records within one demux sample"""
+        # sometimes, one project may be demuxed several times, each time with different demux settings. 
+        # this function performes de-duplication such that one record is kept per sample based on the following criteria:
+        # 1) keep record with the highest number of reads
+        # 2) for multiple sequencing types: choose SR if it applies
+        # 3) for different read lengths, choose the short one
+
+        # categorize the 'seqtype' column
+        mydf['seqtype'] = pd.Categorical(mydf['seqtype'], ordered=True, categories=['SR','PE'])
+        # sort by reads, sequencing type and read lengths
+        mydf.sort_values(by=['PF Clusters','seqtype','read1len','read2len'], ascending=[False,True,True,True], inplace=True)
+        # dedup by choosing the first record
+        return mydf.drop_duplicates(subset=['Sample'], keep='first')
+
     def prepare_table(self):
         """combine information into a dataframe table"""
         # a valid demux unit?
@@ -187,6 +202,8 @@ class MyDemuxUnit:
         mytable.insert(2, 'seqtype', [self.seqtype] * mytable.shape[0])
         mytable.insert(3, 'read1len', [self.read_1_len] * mytable.shape[0])
         mytable.insert(4, 'read2len', [self.read_2_len] * mytable.shape[0])
+        # de-dupliate record by sample
+        mytable = mytable.groupby(by=['Sample']).apply(self.dedup_records)
         return mytable
 
     def to_file(self, outfile):
@@ -694,7 +711,8 @@ def test_MyDemuxAuto():
     #print(da.server_folder_list)
     da.extract_demux_folders()
     da.prepare_table()
-    da.to_file('/tmp','test.auto','xlsx')
+    #da.to_file('/tmp','test.auto','xlsx')
+    da.to_file('/tmp','test.auto','txt')
     #da.to_excel('/tmp','test.auto')
 
 def setup_logging(logfile):
