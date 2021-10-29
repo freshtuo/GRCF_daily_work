@@ -555,6 +555,10 @@ class MyDemuxAuto:
         self.server_folder_list = server_folder_list
         # demux info for all available server folders
         self.folders = []
+        # columns to include
+        self.columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len','Sample','Barcode sequence','PF Clusters','Yield (Mbases)','% >= Q30bases','run_seqtype','run_read1len','run_read2len','run_index1len','run_index2len']
+        # month abbr.
+        self.months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
         # a valid demux auto for output?
         self.valid = True
 
@@ -582,24 +586,64 @@ class MyDemuxAuto:
         #logging.debug(mytable.head(2))
         return mytable
 
-    def to_file(self, outfile):
+    def write_df_to_excel(self, mydf, outdir, outprefix):
+        """write a DataFrame to an excel file, with sheets by months/overview"""
+        # prepare an overview table at the project level
+        overview = mydf.groupby(by=['iLab','project','platform','flowcell_id','date'])['PF Clusters'].agg('sum').reset_index(name='PF Clusters')
+        # sort the overview table by date and iLab
+        overview.sort_values(by=['date','iLab'], inplace=True)
+        # output file
+        outfile = os.path.join(outdir, '{}.{}.xlsx'.format(outprefix, mydf['year'].iloc[0]))
+        # open an excel file handler and write to it
+        with pd.ExcelWriter(outfile) as writer:
+            # overview table
+            overview.to_excel(writer, sheet_name='overview', index=False)
+            # per-month information table
+            mydf['month'] = mydf['date'].dt.month
+            for m in range(12):
+                select_month = (mydf['month'] == m)
+                if select_month.sum() > 0:
+                    mydf[select_month][self.columns].to_excel(writer, sheet_name=self.months[m+1], index=False)
+
+    def to_excel(self, outdir, outprefix='GRCF.demux.summary'):
+        """combine information and write to an excel file"""
+        # unlike writting to a plain text file
+        # 1) one excel per year, one spread sheet per month
+        # 2) include an overview spread sheet storing the total reads per project
+
+        # a valid demux auto?
+        if not self.valid:
+            return None
+        # combine information into a table
+        mytable = self.prepare_table()
+        # separate data by year and write to file
+        mytable['year'] = mytable['date'].dt.year
+        # sort data by year
+        mytable.sort_values(by=['year'], inplace=True)
+        mytable.groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
+
+    def to_file(self, outdir, outprefix='GRCF.demux.summary', outext='txt'):
         """combine information and write to file"""
         # a valid demux auto?
         if not self.valid:
             return None
         # combine information into a table
         mytable = self.prepare_table()
+        # output file
         # write to file
-        if search('\.xlsx$', outfile):
-            mytable.to_excel(outfile, index=False)
-        elif search('\.csv$', outfile):
-            mytable.to_csv(outfile, sep=',', index=False)
-        elif search('\.tsv$|\.txt$', outfile):
-            mytable.to_csv(outfile, sep='\t', index=False)
+        if outext == 'xlsx':
+            self.to_excel(outdir, outprefix)
+            logging.info('write MyDemuxAuto to excel files: {}'.format(os.path.join(outdir, '{}.XXXX.xlsx'.format(outprefix))))
         else:
-            logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
-            return None
-        logging.info('write MyDemuxAuto to file: {}'.format(outfile))
+            outfile = os.path.join(outdir, '{}.{}'.format(outprefix, outext))
+            if outext == 'csv':
+                mytable.to_csv(outfile, sep=',', index=False)
+            elif outext == 'tsv' or outext == 'txt':
+                mytable.to_csv(outfile, sep='\t', index=False)
+            else:
+                logging.warning('Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+                return None
+            logging.info('write MyDemuxAuto to file: {}'.format(outfile))
 
     def __repr__(self):
         """print info for a demux auto"""
@@ -650,12 +694,11 @@ def test_MyDemuxAuto():
     #print(da.server_folder_list)
     da.extract_demux_folders()
     da.prepare_table()
-    da.to_file('/tmp/test.auto.txt')
+    da.to_file('/tmp','test.auto','xlsx')
+    #da.to_excel('/tmp','test.auto')
 
-def main():
-    #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
-    #logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    
+def setup_logging(logfile):
+    """set up logging"""
     # prepare loggings
     log_formatter = logging.Formatter('%(levelname)s: %(message)s')
     root_logger = logging.getLogger()
@@ -670,6 +713,15 @@ def main():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
+
+    # another common way to set up logging, but of less flexibility
+    #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+    #logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    return root_logger
+
+def main():
+    # set up logging
+    root_logger = setup_logging('/tmp/test.auto.log')
 
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
