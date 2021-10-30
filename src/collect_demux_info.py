@@ -267,9 +267,10 @@ class MyDemuxRun:
                 self.platform = 'nextseq2000'
             elif 'novaseq' in self.run_folder.lower():
                 self.platform = 'novaseq'
-            else:
-                self.valid = False
-                logging.warning('Failed to infer platform for {}'.format(self.platform))
+            else:# otherwise, assume this is a novaseq run
+                self.platform = 'novaseq'
+            #    self.valid = False
+            #    logging.warning('Failed to infer platform for {}'.format(self.platform))
             logging.debug('Infer platform: {}'.format(self.platform))
 
     def verify_seq_date(self, date):
@@ -623,15 +624,53 @@ class MyDemuxAuto:
         # output file
         outfile = os.path.join(outdir, '{}.{}.xlsx'.format(outprefix, mydf['year'].iloc[0]))
         # open an excel file handler and write to it
-        with pd.ExcelWriter(outfile, datetime_format='mmm d, yyyy') as writer:
+        with pd.ExcelWriter(outfile, datetime_format='mmm d, yyyy', engine='xlsxwriter') as writer:
+            # get the xlsxwriter workbook
+            workbook = writer.book
+            # add some cell formats
+            format_int = workbook.add_format({'num_format': '#,##'})
             # overview table
             overview.to_excel(writer, sheet_name='overview', index=False)
+            # apply format to sheet 'overview'
+            worksheet = writer.sheets['overview']
+            worksheet.set_column('B:B', 15)
+            worksheet.set_column('C:C', 10)
+            worksheet.set_column('D:D', 15)
+            worksheet.set_column('E:E', 13)
+            worksheet.set_column('F:F', 15, format_int)
+            worksheet.autofilter('A1:F{}'.format(overview.shape[0]+1))
+            worksheet.freeze_panes(1, 0)
             # per-month information table
             mydf['month'] = mydf['date'].dt.month
             for m in range(12):
                 select_month = (mydf['month'] == m)
                 if select_month.sum() > 0:
-                    mydf[select_month][self.columns].to_excel(writer, sheet_name=self.months[m+1], index=False)
+                    sheet_name = self.months[m+1]
+                    mydf[select_month][self.columns].to_excel(writer, sheet_name=sheet_name, index=False)
+                    # apply format to current sheet
+                    worksheet = writer.sheets[sheet_name]
+                    worksheet.set_column('B:B', 15)
+                    worksheet.set_column('C:C', 10)
+                    worksheet.set_column('D:D', 15)
+                    worksheet.set_column('E:E', 13)
+                    worksheet.set_column('F:F', 12)
+                    worksheet.set_column('G:G', 12)
+                    worksheet.set_column('H:H', 10)
+                    worksheet.set_column('I:I', 20)
+                    worksheet.set_column('J:J', 22)
+                    worksheet.set_column('K:K', 15)
+                    worksheet.set_column('L:L', 15, format_int)
+                    worksheet.set_column('M:M', 17, format_int)
+                    worksheet.set_column('N:N', 17)
+                    worksheet.set_column('O:O', 15)
+                    worksheet.set_column('P:P', 15)
+                    worksheet.set_column('Q:Q', 15)
+                    worksheet.set_column('R:R', 15)
+                    worksheet.set_column('S:S', 15)
+                    worksheet.autofilter('A1:S{}'.format(select_month.sum()+1))
+                    worksheet.freeze_panes(1, 0)
+            # Close the Pandas Excel writer and output the Excel file.
+            writer.save()
 
     def to_excel(self, outdir, outprefix='GRCF.demux.summary'):
         """combine information and write to an excel file"""
@@ -655,14 +694,13 @@ class MyDemuxAuto:
         # a valid demux auto?
         if not self.valid:
             return None
-        # combine information into a table
-        mytable = self.prepare_table()
-        # output file
         # write to file
         if outext == 'xlsx':
             self.to_excel(outdir, outprefix)
             logging.info('write MyDemuxAuto to excel files: {}'.format(os.path.join(outdir, '{}.XXXX.xlsx'.format(outprefix))))
         else:
+            # combine information into a table
+            mytable = self.prepare_table()
             outfile = os.path.join(outdir, '{}.{}'.format(outprefix, outext))
             if outext == 'csv':
                 mytable.to_csv(outfile, sep=',', index=False)
@@ -750,15 +788,27 @@ def setup_logging(logfile, level=logging.INFO):
     #logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     return root_logger
 
+def run_MyDemuxAuto():
+    """scan GRCF server demux folders"""
+    # run on the gc6 server
+    server_folders = ['/data/seq/NovaSeq6000','/scratch/seq_data/NovaSeq6000','/data/seq/gc7_demux_runs',\
+        '/gc7-data/NovaSeq6000','/gc7-data/NextSeq500',\
+        '/gc5/NextSeq500','/gc5/NovaSeq6000',\
+        '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500','/gc4/HiSeq2500_new/flowcellA','/gc4/HiSeq2500_new/flowcellB']
+    da = MyDemuxAuto(server_folders)
+    da.extract_demux_folders()
+    da.to_file('/data/seq/tmp','GRCF.demux.summary','xlsx')
+
 def main():
     # set up logging
-    root_logger = setup_logging('/tmp/test.auto.log', level=logging.INFO)
+    root_logger = setup_logging('/data/seq/tmp/GRCF.demux.summary.auto.log', level=logging.INFO)
     #root_logger = setup_logging('/tmp/test.auto.log', level=logging.DEBUG)
 
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
     #test_MyDemuxFolder()
-    test_MyDemuxAuto()
+    #test_MyDemuxAuto()
+    run_MyDemuxAuto()
 
 # main
 if __name__ == '__main__':
