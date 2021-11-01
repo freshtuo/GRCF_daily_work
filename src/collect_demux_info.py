@@ -353,12 +353,16 @@ class MyDemuxRun:
         # extract read length info
         for x in root.iter(r1id):
             self.read_1_len = int(x.text)
+            break
         for x in root.iter(r2id):
             self.read_2_len = int(x.text)
+            break
         for x in root.iter(i1id):
             self.index_1_len = int(x.text)
+            break
         for x in root.iter(i2id):
             self.index_2_len = int(x.text)
+            break
         # do we have length for all reads?
         if self.read_1_len == -1:
             self.valid = False
@@ -817,15 +821,15 @@ def run_MyDemuxAuto():
 
 def main():
     # set up logging
-    #root_logger = setup_logging('/data/seq/tmp/GRCF.demux.summary.auto.log', level=logging.INFO)
+    root_logger = setup_logging('/data/seq/tmp/GRCF.demux.summary.auto.log', level=logging.INFO)
     #root_logger = setup_logging('/tmp/test.auto.log', level=logging.DEBUG)
-    root_logger = setup_logging('/tmp/test.auto.log', level=logging.INFO)
+    #root_logger = setup_logging('/tmp/test.auto.log', level=logging.INFO)
 
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
-    test_MyDemuxFolder()
+    #test_MyDemuxFolder()
     #test_MyDemuxAuto()
-    #run_MyDemuxAuto()
+    run_MyDemuxAuto()
 
 # main
 if __name__ == '__main__':
