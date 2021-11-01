@@ -144,6 +144,8 @@ class MyDemuxUnit:
                 self.read_1_len = self.guess_read_length(tr1s[0])
                 if len(tr2s) > 0:
                     self.read_2_len = self.guess_read_length(tr2s[0])
+                else:
+                    self.read_2_len = 0
                 logging.debug('MyDemuxUnit: Infer sequencing type: {}'.format(self.seqtype))
                 logging.debug('MyDemuxUnit: Infer read 1 length: {}'.format(self.read_1_len))
                 if len(tr2s) > 0:
@@ -651,8 +653,8 @@ class MyDemuxAuto:
             overview.to_excel(writer, sheet_name='overview', index=False)
             # apply format to sheet 'overview'
             worksheet = writer.sheets['overview']
-            worksheet.set_column('B:B', 15)
-            worksheet.set_column('C:C', 10)
+            worksheet.set_column('B:B', 20)
+            worksheet.set_column('C:C', 12)
             worksheet.set_column('D:D', 15)
             worksheet.set_column('E:E', 13)
             worksheet.set_column('F:F', 15, format_int)
@@ -668,23 +670,23 @@ class MyDemuxAuto:
                     # apply format to current sheet
                     worksheet = writer.sheets[sheet_name]
                     worksheet.set_column('B:B', 15)
-                    worksheet.set_column('C:C', 10)
+                    worksheet.set_column('C:C', 12)
                     worksheet.set_column('D:D', 15)
                     worksheet.set_column('E:E', 13)
                     worksheet.set_column('F:F', 12)
-                    worksheet.set_column('G:G', 12)
-                    worksheet.set_column('H:H', 10)
+                    worksheet.set_column('G:G', 13)
+                    worksheet.set_column('H:H', 13)
                     worksheet.set_column('I:I', 20)
                     worksheet.set_column('J:J', 22)
                     worksheet.set_column('K:K', 15)
                     worksheet.set_column('L:L', 15, format_int)
-                    worksheet.set_column('M:M', 17, format_int)
-                    worksheet.set_column('N:N', 17)
-                    worksheet.set_column('O:O', 15)
-                    worksheet.set_column('P:P', 15)
-                    worksheet.set_column('Q:Q', 15)
-                    worksheet.set_column('R:R', 15)
-                    worksheet.set_column('S:S', 15)
+                    worksheet.set_column('M:M', 18, format_int)
+                    worksheet.set_column('N:N', 18)
+                    worksheet.set_column('O:O', 16)
+                    worksheet.set_column('P:P', 16)
+                    worksheet.set_column('Q:Q', 16)
+                    worksheet.set_column('R:R', 16)
+                    worksheet.set_column('S:S', 16)
                     worksheet.autofilter('A1:S{}'.format(select_month.sum()+1))
                     worksheet.freeze_panes(1, 0)
             # Close the Pandas Excel writer and output the Excel file.
@@ -818,6 +820,7 @@ def run_MyDemuxAuto():
     da = MyDemuxAuto(server_folders)
     da.extract_demux_folders()
     da.to_file('/data/seq/tmp','GRCF.demux.summary','xlsx')
+    da.to_file('/data/seq/tmp','GRCF.demux.summary','txt')
 
 def main():
     # set up logging
