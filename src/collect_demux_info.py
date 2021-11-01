@@ -130,6 +130,11 @@ class MyDemuxUnit:
                 # read 1/2 fastq
                 tr1s = [x for x in tfqs if search('R1_001\.fastq\.gz', x)]
                 tr2s = [x for x in tfqs if search('R2_001\.fastq\.gz', x)]
+                # find both read 1 and read 2 files
+                if len(tr1s) == 0:
+                    self.valid = False
+                    logging.warning('MyDemuxUnit: read 1 file does not exist, failed to infer read length.')
+                    return None
                 # SR or PE
                 if len(tr2s) == 0:
                     self.seqtype = 'SR'
