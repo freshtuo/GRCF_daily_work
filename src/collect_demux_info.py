@@ -394,8 +394,17 @@ class MyDemuxRun:
                 for tfile in files:
                     if search('\.fastq\.gz$', tfile) and not search('^Undetermined_', tfile):
                         # there are cases where fastq files were saved in a separate folder per sample
+                        # in this case, use its parent folder as 'fastq_folder' for MyDemuxUnit
+                        # for current runs, a fastq folder is named in the format 'PI-user-iLab(_20XX_XX_XX)'
+                        # for older runs, the folder name may be arbitrary (double check its parent folder is not 'Unaligned(_X/outs/fastq_path)'
                         if not search('.*?\-.*?\-\d+', os.path.basename(root)):
-                            temp_folders.append(os.path.dirname(root))
+                            parent_folder = os.path.basename(os.path.dirname(root))
+                            if search('.*?\-.*?\-\d+', parent_folder):
+                                temp_folders.append(os.path.dirname(root))
+                            elif search('Unaligned', parent_folder) or search('fastq_path', parent_folder):
+                                temp_folders.append(root)
+                            else:
+                                temp_folders.append(os.path.dirname(root))
                         else:
                             temp_folders.append(root)
                         break
@@ -721,8 +730,8 @@ class MyDemuxAuto:
 # functions
 def test_MyDemuxUnit():
     #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_1/Guzman-NMT-11319_2021_10_15','HL5G2DSX2')
-    #du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
-    du = MyDemuxUnit('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX/Unaligned_1/Landau-RC-8951_2020_06_25','HMNKGDRXX')
+    du = MyDemuxUnit('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2/Unaligned_2/Mason-ND-11312_2021_10_15','HL5G2DSX2')
+    #du = MyDemuxUnit('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX/Unaligned_1/Landau-RC-8951_2020_06_25','HMNKGDRXX')
     #du.infer_ilab()
     #du.infer_report_file()
     #du.infer_seq_type()
@@ -735,7 +744,8 @@ def test_MyDemuxUnit():
 def test_MyDemuxRun():
     #dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
     #dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
-    dr = MyDemuxRun('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX')
+    #dr = MyDemuxRun('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX')
+    dr = MyDemuxRun('/gc7-data/NovaSeq6000/210730_A00814_0465_AHHKGVDSX2')
     #dr.infer_platform()
     #dr.infer_seq_date()
     #dr.infer_flowcell_id()
@@ -750,7 +760,8 @@ def test_MyDemuxRun():
     #print(dr.units[0])
 
 def test_MyDemuxFolder():
-    df = MyDemuxFolder('/scratch/seq_data/NovaSeq6000')
+    #df = MyDemuxFolder('/scratch/seq_data/NovaSeq6000')
+    df = MyDemuxFolder('/gc7-data/NovaSeq6000')
     #print(df.server_folder)
     df.extract_demux_runs()
     df.prepare_table()
@@ -801,14 +812,15 @@ def run_MyDemuxAuto():
 
 def main():
     # set up logging
-    root_logger = setup_logging('/data/seq/tmp/GRCF.demux.summary.auto.log', level=logging.INFO)
+    #root_logger = setup_logging('/data/seq/tmp/GRCF.demux.summary.auto.log', level=logging.INFO)
     #root_logger = setup_logging('/tmp/test.auto.log', level=logging.DEBUG)
+    root_logger = setup_logging('/tmp/test.auto.log', level=logging.INFO)
 
     #test_MyDemuxUnit()
     #test_MyDemuxRun()
-    #test_MyDemuxFolder()
+    test_MyDemuxFolder()
     #test_MyDemuxAuto()
-    run_MyDemuxAuto()
+    #run_MyDemuxAuto()
 
 # main
 if __name__ == '__main__':
