@@ -672,7 +672,7 @@ class MyDemuxAuto:
             # per-month information table
             mydf['month'] = mydf['date'].dt.month
             for m in range(12):
-                select_month = (mydf['month'] == m)
+                select_month = (mydf['month'] == m+1)
                 if select_month.sum() > 0:
                     sheet_name = self.months[m+1]
                     mydf[select_month][self.columns].to_excel(writer, sheet_name=sheet_name, index=False)
