@@ -4,16 +4,13 @@
 #
 
 import sys
+import os
 import gzip
 import logging
 
 import pandas as pd
 import xml.etree.ElementTree as ET
-import os.path
 
-from os import getcwd
-from os import listdir
-from os import walk
 from re import findall
 from re import search
 from argparse import ArgumentParser
@@ -123,7 +120,7 @@ class MyDemuxUnit:
         if self.seqtype is None or self.read_1_len is None:
             # fetch available fastq file
             tfqs = []
-            for root, directories, files in walk(self.fastq_folder):
+            for root, directories, files in os.walk(self.fastq_folder):
                 tfqs.extend([os.path.join(root, x) for x in files if search('fastq\.gz$',x) and not search('^Undetermined_',x)])
             # fastq files found?
             if len(tfqs) > 0:
@@ -211,6 +208,8 @@ class MyDemuxUnit:
             return None
         # combine information into a table
         mytable = self.prepare_table()
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
             mytable.to_excel(outfile, index=False)
@@ -397,27 +396,33 @@ class MyDemuxRun:
         """extract demux information for each project"""
         # screen for fastq folders under run folder
         # assume fastq stored under folder named 'Unaligned', but not necessarily directly under it (e.g. 10X runs)
-        candidate_folders = [x for x in listdir(self.run_folder) if search('Unaligned',x)]
+        candidate_folders = [x for x in os.listdir(self.run_folder) if search('Unaligned',x)]
         # scan for folders containing fastq files (demux unit)
         temp_folders = []
         for folder in candidate_folders:
-            for root, directories, files in walk(os.path.join(self.run_folder, folder)):
+            for root, directories, files in os.walk(os.path.join(self.run_folder, folder)):
                 for tfile in files:
                     if search('\.fastq\.gz$', tfile) and not search('^Undetermined_', tfile):
-                        # there are cases where fastq files were saved in a separate folder per sample
-                        # in this case, use its parent folder as 'fastq_folder' for MyDemuxUnit
-                        # for current runs, a fastq folder is named in the format 'PI-user-iLab(_20XX_XX_XX)'
-                        # for older runs, the folder name may be arbitrary (double check its parent folder is not 'Unaligned(_X/outs/fastq_path)'
-                        if not search('.*?\-.*?\-\d+', os.path.basename(root)):
-                            parent_folder = os.path.basename(os.path.dirname(root))
-                            if search('.*?\-.*?\-\d+', parent_folder):
-                                temp_folders.append(os.path.dirname(root))
-                            elif search('Unaligned', parent_folder) or search('fastq_path', parent_folder):
-                                temp_folders.append(root)
-                            else:
-                                temp_folders.append(os.path.dirname(root))
-                        else:
+                        # search for the sub-folder right underneath the 'UnalignedXX' or 'fastq_path' folder
+                        # --- there are cases where fastq files were saved in a separate folder per sample
+                        # --- for current runs, a fastq folder is named in the format 'PI-user-iLab(_20XX_XX_XX)'
+                        # --- for older runs, the folder name may be arbitrary
+                        # ---------------------------------------------------------------------------------------
+                        # separate path into pieces
+                        items = os.path.normpath(root).split(os.sep)
+                        # search for 'fastq_path' or 'Unaligned'
+                        k = len(items) - 1
+                        while k >= 0:
+                            if search('Unaligned|fastq_path', items[k]):
+                                break
+                            k -= 1
+                        if k < 0:# failed to find Unaligned or fastq_path folder
+                            logging.warning("MyDemuxRun: failed to locate fastq folder, unable to detect key words 'Unaligned' or 'fastq_path'")
+                            # return the current folder as fastq_path, another downstream warning messages will give more details for debugging
                             temp_folders.append(root)
+                        else:# find the key word
+                            # use the folder right underneath it
+                            temp_folders.append(os.sep.join(items[:k+2]))
                         break
         fastq_folders = list(set(temp_folders))
         #logging.debug('MyDemuxRun: '+'\n'.join(fastq_folders))
@@ -492,6 +497,8 @@ class MyDemuxRun:
             return None
         # combine information into a table
         mytable = self.prepare_table()
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
             mytable.to_excel(outfile, index=False)
@@ -538,7 +545,7 @@ class MyDemuxFolder:
         logging.info('[Folder]\t{}'.format(self.server_folder))
         # screen for all available sequencing runs
         # e.g. 210901_A00814_0481_AHJ5T2DRXY
-        run_folders = [x for x in listdir(self.server_folder) if search('\d+_[A-Z\d]+_\d+_[A-Za-z\d]+',x)]
+        run_folders = [x for x in os.listdir(self.server_folder) if search('\d+_[A-Z\d]+_\d+_[A-Za-z\d]+',x)]
         # process each demux run folder and store it as a MyDemuxRun object
         for folder in run_folders:
             logging.info('[Run]\t{}'.format(folder))
@@ -570,6 +577,8 @@ class MyDemuxFolder:
             return None
         # combine information into a table
         mytable = self.prepare_table()
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
             mytable.to_excel(outfile, index=False)
@@ -756,7 +765,9 @@ def test_MyDemuxRun():
     #dr = MyDemuxRun('/gc7-data/NovaSeq6000/211015_A00814_0503_AHL5G2DSX2')
     #dr = MyDemuxRun('/scratch/seq_data/NovaSeq6000/211014_A00814_0502_BHL5H3DSX2')
     #dr = MyDemuxRun('/data/seq/NovaSeq6000/200625_A00814_0207_BHMNKGDRXX')
-    dr = MyDemuxRun('/gc7-data/NovaSeq6000/210730_A00814_0465_AHHKGVDSX2')
+    #dr = MyDemuxRun('/gc7-data/NovaSeq6000/210730_A00814_0465_AHHKGVDSX2')
+    dr = MyDemuxRun('/gc-archive2/gc5-backup/GRCF_data_archive/NovaSeq6000/200309_A00814_0164_AHNMV7DMXX')
+    #dr = MyDemuxRun('/gc-archive2/gc5-backup/GRCF_data_archive/NovaSeq6000/200724_A00814_0224_BHMHTLDRXX')
     #dr.infer_platform()
     #dr.infer_seq_date()
     #dr.infer_flowcell_id()
@@ -816,7 +827,11 @@ def run_MyDemuxAuto():
     server_folders = ['/data/seq/NovaSeq6000','/scratch/seq_data/NovaSeq6000','/data/seq/gc7_demux_runs',\
         '/gc7-data/NovaSeq6000','/gc7-data/NextSeq500',\
         '/gc5/NextSeq500','/gc5/NovaSeq6000',\
-        '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500','/gc4/HiSeq2500_new/flowcellA','/gc4/HiSeq2500_new/flowcellB']
+        '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500','/gc4/HiSeq2500_new/flowcellA','/gc4/HiSeq2500_new/flowcellB',\
+        '/gc-archive2/gc4-backup/HiSeq4000/flowcellA','/gc-archive2/gc4-backup/GRCF_data_archive/HiSeq4000',\
+        '/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq2000','/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq500',\
+        '/gc-archive2/gc5-backup/GRCF_data_archive/NovaSeq6000','/genome2/GRCF_data_archive/HiSeq2500',\
+        '/genome2/GRCF_data_archive/HiSeq4000','/genome2/GRCF_data_archive/NextSeq500']
     da = MyDemuxAuto(server_folders)
     da.extract_demux_folders()
     da.to_file('/data/seq/tmp','GRCF.demux.summary','xlsx')
