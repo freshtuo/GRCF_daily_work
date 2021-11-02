@@ -255,8 +255,6 @@ class MyDemuxUnit:
             return None
         # combine information into a table
         mytable = self.prepare_table()
-        # sort by sequencing date, instrument, iLab, project name, sample name
-        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
             mytable.to_excel(outfile, index=False)
