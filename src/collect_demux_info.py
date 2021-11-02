@@ -67,7 +67,7 @@ class MyDemuxUnit:
             folder_name = os.path.basename(self.fastq_folder)
             tmatches_A = search('(\D+)\-([\d]{4,5})_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (XXXX)-(10830)_2021_07_19
             tmatches_B = search('(\D+)([\d]{4,5})_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (XXXX)(5830)_2018_04_05
-            tmatches_C = search('(\D+)([\d]{4,5})_(.*?)_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (Ning)(6652)_rerun_2019_03_13
+            tmatches_C = search('(\D+)([\d]{4,5})_.*?_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (Ning)(6652)_rerun_2019_03_13
             tmatches_D = search('(\D+)-([\d]{4,5})$', folder_name)# (Mason-DB)-(8850)
             tmatches_E = search('^(\D+)-([\d]{4,5})\D+', folder_name)# (Mason-DB)-(8850)-2
             tmatches_F = search('(\D+)([\d]{4,5})$', folder_name)# (Kaifang)(6912)
