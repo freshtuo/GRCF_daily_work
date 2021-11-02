@@ -49,15 +49,16 @@ class MyDemuxUnit:
 
     def infer_ilab(self):
         """guest iLab id and project name"""
-        # eg: Loda-MJ-10557_2021_06_15
-        #     Diaz-Meco-MADM-10830_2021_07_19
-        #     Delia
-        #     Delia_2021_10_15
+        # eg: Loda-MJ-10557_2021_06_15         --> Loda-MJ & 10557
+        #     Diaz-Meco-MADM-10830_2021_07_19  --> Diaz-Meco-MADM & 10830
+        #     CS-10045_2021_03_25              --> CS & 10045
+        #     Delia                            --> Delia & -1
+        #     Delia_2021_10_15                 --> Delia & -1
         if self.ilab == -1:
             folder_name = os.path.basename(self.fastq_folder)
             tmatches_A = search('(.*?)_\d+_\d+_\d+', folder_name)
-            tmatches_B = search('(.*?\-.*?)\-(\d+)_\d+_\d+_\d+', folder_name)
-            tmatches_C = search('(.*?\-.*?)\-(\d+)', folder_name)
+            tmatches_B = search('(.*?)\-(\d+)_\d+_\d+_\d+', folder_name)
+            tmatches_C = search('(.*?)\-(\d+)', folder_name)
             if tmatches_B:
                 self.project, self.ilab = tmatches_B.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
