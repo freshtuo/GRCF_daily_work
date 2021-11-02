@@ -55,20 +55,27 @@ class MyDemuxUnit:
         #     Delia_2021_10_15
         if self.ilab == -1:
             folder_name = os.path.basename(self.fastq_folder)
-            tmatches_A = findall('(\d+)', folder_name)
-            tmatches_B = search('(.*?)_\d+_\d+_\d+', folder_name)
-            if tmatches_A:
-                self.ilab = int(tmatches_A[0])
-                self.project = folder_name[:folder_name.find(tmatches_A[0])-1]
+            tmatches_A = search('(.*?)_\d+_\d+_\d+', folder_name)
+            tmatches_B = search('(.*?\-.*?)\-(\d+)_\d+_\d+_\d+', folder_name)
+            tmatches_C = search('(.*?\-.*?)\-(\d+)', folder_name)
+            if tmatches_B:
+                self.project, self.ilab = tmatches_B.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_C:
+                self.project, self.ilab = tmatches_C.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_A:
+                self.project = tmatches_A.groups()[0]
+                # some project does not have a iLab id, so leave it as '-1' while still keep this project
+                logging.warning('MyDemuxUnit: Failed to infer iLab id: {}'.format(self.fastq_folder))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
             else:
                 # some project does not have a iLab id, so leave it as '-1' while still keep this project
                 ###self.valid = False
                 # get project name
                 self.project = folder_name
-                if tmatches_B:
-                    self.project = tmatches_B.groups()[0]
                 logging.warning('MyDemuxUnit: Failed to infer iLab id: {}'.format(self.fastq_folder))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
 
