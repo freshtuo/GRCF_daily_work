@@ -52,6 +52,7 @@ class MyDemuxUnit:
         # eg: Loda-MJ-10557_2021_06_15         --> Loda-MJ & 10557
         #     Diaz-Meco-MADM-10830_2021_07_19  --> Diaz-Meco-MADM & 10830
         #     CS-10045_2021_03_25              --> CS & 10045
+        #     Rebecca5830_2018_04_05           --> Rebecca & 5830
         #     Delia                            --> Delia & -1
         #     Delia_2021_10_15                 --> Delia & -1
         if self.ilab == -1:
@@ -59,12 +60,17 @@ class MyDemuxUnit:
             tmatches_A = search('(.*?)_\d+_\d+_\d+', folder_name)
             tmatches_B = search('(.*?)\-(\d+)_\d+_\d+_\d+', folder_name)
             tmatches_C = search('(.*?)\-(\d+)', folder_name)
+            tmatches_D = search('(.*?)(\d+)_\d+_\d+_\d+', folder_name)
             if tmatches_B:
                 self.project, self.ilab = tmatches_B.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
             elif tmatches_C:
                 self.project, self.ilab = tmatches_C.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_D:
+                self.project, self.ilab = tmatches_D.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
             elif tmatches_A:
