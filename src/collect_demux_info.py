@@ -49,19 +49,36 @@ class MyDemuxUnit:
 
     def infer_ilab(self):
         """guest iLab id and project name"""
+        # assume 4-5 digit iLab id
         # eg: Loda-MJ-10557_2021_06_15         --> Loda-MJ & 10557
         #     Diaz-Meco-MADM-10830_2021_07_19  --> Diaz-Meco-MADM & 10830
         #     CS-10045_2021_03_25              --> CS & 10045
         #     Rebecca5830_2018_04_05           --> Rebecca & 5830
+        #     Ning6652_rerun_2019_03_13
+        #     Kaifang6912
         #     Delia                            --> Delia & -1
         #     Delia_2021_10_15                 --> Delia & -1
+        #     Mason-DB-8850-2                  --> Mason-DB & 8850
+        #     Nuria_2019_02_08_lane1           --> Nuria & -1
+        #     Shawon_dropseq_062216            --> 
+        #     Shawon_Suture_S4                 --> 
+        #     Asaf07062016
         if self.ilab == -1:
             folder_name = os.path.basename(self.fastq_folder)
-            tmatches_A = search('(.*?)_\d+_\d+_\d+', folder_name)
-            tmatches_B = search('(.*?)\-(\d+)_\d+_\d+_\d+', folder_name)
-            tmatches_C = search('(.*?)\-(\d+)', folder_name)
-            tmatches_D = search('(.*?)(\d+)_\d+_\d+_\d+', folder_name)
-            if tmatches_B:
+            tmatches_A = search('(\D+)\-([\d]{4,5})_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (XXXX)-(10830)_2021_07_19
+            tmatches_B = search('(\D+)([\d]{4,5})_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (XXXX)(5830)_2018_04_05
+            tmatches_C = search('(\D+)([\d]{4,5})_(.*?)_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (Ning)(6652)_rerun_2019_03_13
+            tmatches_D = search('(\D+)-([\d]{4,5})$', folder_name)# (Mason-DB)-(8850)
+            tmatches_E = search('^(\D+)-([\d]{4,5})\D+', folder_name)# (Mason-DB)-(8850)-2
+            tmatches_F = search('(\D+)([\d]{4,5})$', folder_name)# (Kaifang)(6912)
+            tmatches_G = search('(\D+)_([\d]{4,5})$', folder_name)# (XXXX)_(5002)
+            tmatches_H = search('(\D+)_[\d]{4}_[\d]{2}_[\d]{2}', folder_name)# (XXXX)_2021_10_15 or Nuria_2019_02_08_lane1
+            tmatches_I = search('([A-Za-z]+)[_\-]*[\d]{6,8}$', folder_name)# (XXXX)_211015 or Nuria_20190208
+            if tmatches_A:
+                self.project, self.ilab = tmatches_A.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_B:
                 self.project, self.ilab = tmatches_B.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
@@ -73,8 +90,24 @@ class MyDemuxUnit:
                 self.project, self.ilab = tmatches_D.groups()
                 logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
-            elif tmatches_A:
-                self.project = tmatches_A.groups()[0]
+            elif tmatches_E:
+                self.project, self.ilab = tmatches_E.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_F:
+                self.project, self.ilab = tmatches_F.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_G:
+                self.project, self.ilab = tmatches_G.groups()
+                logging.debug('MyDemuxUnit: Infer iLab id: {}'.format(self.ilab))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_H:
+                self.project = tmatches_H.groups()[0]
+                logging.warning('MyDemuxUnit: Failed to infer iLab id: {}'.format(self.fastq_folder))
+                logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            elif tmatches_I:
+                self.project = tmatches_I.groups()[0]
                 # some project does not have a iLab id, so leave it as '-1' while still keep this project
                 logging.warning('MyDemuxUnit: Failed to infer iLab id: {}'.format(self.fastq_folder))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
