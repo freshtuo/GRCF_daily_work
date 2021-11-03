@@ -23,7 +23,7 @@ from argparse import ArgumentDefaultsHelpFormatter
 class MyDemuxUnit:
     """Class for saving info of a single demux unit"""
 
-    def __init__(self, fastq_folder, flowcell_id, report_file=None, ilab=-1, project=None, seqtype=None, read_1_len=-1, read_2_len=-1):
+    def __init__(self, fastq_folder, flowcell_id, report_file=None, ilab=-1, project=None, seqtype=None, read_1_len=-1, read_2_len=-1, detail_table=None):
         """class constructor"""
         # fastq data folder
         self.fastq_folder = fastq_folder
@@ -42,6 +42,8 @@ class MyDemuxUnit:
         # read length
         self.read_1_len = read_1_len
         self.read_2_len = read_2_len
+        # detailed data table
+        self.detail = detail_table
         # columns to include
         self.columns = ['Sample','Barcode sequence','num_lanes','PF Clusters','Yield (Mbases)','% >= Q30bases']
         # a valid demux unit for output?
@@ -235,35 +237,36 @@ class MyDemuxUnit:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
-        # a valid demux unit?
+        # a valid demux unit and no existing tables?
         if not self.valid:
             logging.warning('MyDemuxUnit: Not a valid demux project: {}'.format(self.fastq_folder))
             return None
+        if self.detail is not None:
+            logging.warning('MyDemuxUnit: existing detail table.')
+            return None
         # get a copy of summary for output purpose
-        mytable = self.summary[self.columns].copy()
+        self.detail = self.summary[self.columns].copy()
         # add other information
-        mytable.insert(0, 'iLab', [self.ilab] * mytable.shape[0])
-        mytable.insert(1, 'project', [self.project] * mytable.shape[0])
-        mytable.insert(2, 'seqtype', [self.seqtype] * mytable.shape[0])
-        mytable.insert(3, 'read1len', [self.read_1_len] * mytable.shape[0])
-        mytable.insert(4, 'read2len', [self.read_2_len] * mytable.shape[0])
-        return mytable
+        self.detail.insert(0, 'iLab', [self.ilab] * self.detail.shape[0])
+        self.detail.insert(1, 'project', [self.project] * self.detail.shape[0])
+        self.detail.insert(2, 'seqtype', [self.seqtype] * self.detail.shape[0])
+        self.detail.insert(3, 'read1len', [self.read_1_len] * self.detail.shape[0])
+        self.detail.insert(4, 'read2len', [self.read_2_len] * self.detail.shape[0])
+        # sort by iLab id
+        self.detail.sort_values(by='iLab', inplace=True)
 
     def to_file(self, outfile):
         """combine information and write to file"""
-        # a valid demux unit?
-        if not self.valid:
-            logging.warning('MyDemuxUnit: Not a valid demux project: {}'.format(self.fastq_folder))
+        # detail table ready?
+        if self.detail is None:
             return None
-        # combine information into a table
-        mytable = self.prepare_table()
         # write to file
         if search('\.xlsx$', outfile):
-            mytable.to_excel(outfile, index=False)
+            self.detail.to_excel(outfile, index=False)
         elif search('\.csv$', outfile):
-            mytable.to_csv(outfile, sep=',', index=False)
+            self.detail.to_csv(outfile, sep=',', index=False)
         elif search('\.tsv$|\.txt$', outfile):
-            mytable.to_csv(outfile, sep='\t', index=False)
+            self.detail.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('MyDemuxUnit: Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
             return None
@@ -287,7 +290,7 @@ class MyDemuxUnit:
 class MyDemuxRun:
     """Class for saving info of an entire demux run"""
 
-    def __init__(self, run_folder, date=None, flowcell_id=None, platform=None, seqtype=None, read_1_len=-1, read_2_len=-1, index_1_len=-1, index_2_len=-1):
+    def __init__(self, run_folder, date=None, flowcell_id=None, platform=None, seqtype=None, read_1_len=-1, read_2_len=-1, index_1_len=-1, index_2_len=-1, detail_table=None):
         """class constructor"""
         # run folder
         self.run_folder = run_folder
@@ -306,6 +309,8 @@ class MyDemuxRun:
         self.index_2_len = index_2_len
         # projects in this run
         self.units = []
+        # detailed data table
+        self.detail = detail_table
         # a valid demux run for output?
         self.valid = True
 
@@ -511,48 +516,45 @@ class MyDemuxRun:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
-        # a valid demux run?
-        if not self.valid:
+        # a valid demux run + no existing tables?
+        if not self.valid or self.detail is not None:
             return None
         # merge information from each demux unit
-        mytable = pd.concat([x.prepare_table() for x in self.units])
+        self.detail = pd.concat([x.prepare_table() for x in self.units])
         # add additional information
         # platform
-        mytable.insert(2, 'platform', [self.platform] * mytable.shape[0])
+        self.detail.insert(2, 'platform', [self.platform] * self.detail.shape[0])
         # flowcell id
-        mytable.insert(3, 'flowcell_id', [self.fcid] * mytable.shape[0])
+        self.detail.insert(3, 'flowcell_id', [self.fcid] * self.detail.shape[0])
         # sequencing date
-        mytable.insert(4, 'date', [self.date] * mytable.shape[0])
-        mytable['date'] = pd.to_datetime(mytable['date'], format="%Y-%m-%d")
+        self.detail.insert(4, 'date', [self.date] * self.detail.shape[0])
+        self.detail['date'] = pd.to_datetime(self.detail['date'], format="%Y-%m-%d")
         # run sequencing type
-        mytable.insert(mytable.shape[1], 'run_seqtype', [self.seqtype] * mytable.shape[0])
+        self.detail.insert(self.detail.shape[1], 'run_seqtype', [self.seqtype] * self.detail.shape[0])
         # run read length
-        mytable.insert(mytable.shape[1], 'run_read1len', [self.read_1_len] * mytable.shape[0])
-        mytable.insert(mytable.shape[1], 'run_read2len', [self.read_2_len] * mytable.shape[0])
-        mytable.insert(mytable.shape[1], 'run_index1len', [self.index_1_len] * mytable.shape[0])
-        mytable.insert(mytable.shape[1], 'run_index2len', [self.index_2_len] * mytable.shape[0])
+        self.detail.insert(self.detail.shape[1], 'run_read1len', [self.read_1_len] * self.detail.shape[0])
+        self.detail.insert(self.detail.shape[1], 'run_read2len', [self.read_2_len] * self.detail.shape[0])
+        self.detail.insert(self.detail.shape[1], 'run_index1len', [self.index_1_len] * self.detail.shape[0])
+        self.detail.insert(self.detail.shape[1], 'run_index2len', [self.index_2_len] * self.detail.shape[0])
         # de-dupliate record by sample
-        mytable = self.dedup_records(mytable)
-        #logging.debug('MyDemuxRun: {}'.format(mytable.shape))
-        #logging.debug('MyDemuxRun: {}'.format(mytable.head(2)))
-        return mytable
+        self.detail = self.dedup_records(self.detail)
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
+        #logging.debug('MyDemuxRun: {}'.format(self.detail.shape))
+        #logging.debug('MyDemuxRun: {}'.format(self.detail.head(2)))
 
     def to_file(self, outfile):
         """combine information and write to file"""
-        # a valid demux run?
-        if not self.valid:
+        # details table ready?
+        if self.detail is None:
             return None
-        # combine information into a table
-        mytable = self.prepare_table()
-        # sort by sequencing date, instrument, iLab, project name, sample name
-        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
-            mytable.to_excel(outfile, index=False)
+            self.detail.to_excel(outfile, index=False)
         elif search('\.csv$', outfile):
-            mytable.to_csv(outfile, sep=',', index=False)
+            self.detail.to_csv(outfile, sep=',', index=False)
         elif search('\.tsv$|\.txt$', outfile):
-            mytable.to_csv(outfile, sep='\t', index=False)
+            self.detail.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('MyDemuxRun: Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
             return None
@@ -578,12 +580,14 @@ class MyDemuxRun:
 class MyDemuxFolder:
     """Class for saving info of runs under a given folder"""
 
-    def __init__(self, server_folder):
+    def __init__(self, server_folder, detail_table=None):
         """class constructor"""
         # server folder
         self.server_folder = server_folder
         # sequencing runs inside this folder
         self.runs = []
+        # detailed data table
+        self.detail = detail_table
         # a valid demux folder for output?
         self.valid = True
 
@@ -608,31 +612,28 @@ class MyDemuxFolder:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
-        # a valid demux folder?
-        if not self.valid:
+        # a valid demux folder + no existing table?
+        if not self.valid or self.detail is not None:
             return None
         # merge information from each demux run
-        mytable = pd.concat([x.prepare_table() for x in self.runs])
-        #logging.debug('MyDemuxFolder: {}'.format(mytable.shape))
-        #logging.debug('MyDemuxFolder: {}'.format(mytable.head(2)))
-        return mytable
+        self.detail = pd.concat([x.prepare_table() for x in self.runs])
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
+        #logging.debug('MyDemuxFolder: {}'.format(self.detail.shape))
+        #logging.debug('MyDemuxFolder: {}'.format(self.detail.head(2)))
 
     def to_file(self, outfile):
         """combine information and write to file"""
-        # a valid demux folder?
-        if not self.valid:
+        # details table ready?
+        if self.detail is None:
             return None
-        # combine information into a table
-        mytable = self.prepare_table()
-        # sort by sequencing date, instrument, iLab, project name, sample name
-        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # write to file
         if search('\.xlsx$', outfile):
-            mytable.to_excel(outfile, index=False)
+            self.detail.to_excel(outfile, index=False)
         elif search('\.csv$', outfile):
-            mytable.to_csv(outfile, sep=',', index=False)
+            self.detail.to_csv(outfile, sep=',', index=False)
         elif search('\.tsv$|\.txt$', outfile):
-            mytable.to_csv(outfile, sep='\t', index=False)
+            self.detail.to_csv(outfile, sep='\t', index=False)
         else:
             logging.warning('MyDemuxFolder: Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
             return None
@@ -650,12 +651,16 @@ class MyDemuxFolder:
 class MyDemuxAuto:
     """Class for saving info on multiple server locations"""
 
-    def __init__(self, server_folder_list):
+    def __init__(self, server_folder_list, detail_table=None, overview_table=None):
         """class constructor"""
         # a list of server folders to screen
         self.server_folder_list = server_folder_list
         # demux info for all available server folders
         self.folders = []
+        # detailed data table
+        self.detail = detail_table
+        # overview data table
+        self.overview = overview_table
         # columns to include
         self.columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len',\
             'Sample','Barcode sequence','num_lanes','PF Clusters','Yield (Mbases)','% >= Q30bases',\
@@ -680,16 +685,19 @@ class MyDemuxAuto:
 
     def prepare_table(self):
         """combine information into a dataframe table"""
-        # a valid demux auto?
-        if not self.valid:
+        # a valid demux auto + no existing tables?
+        if not self.valid or self.detail is not None or self.overview is not None:
             return None
         # merge information from all demux folders
-        mytable = pd.concat([x.prepare_table() for x in self.folders])
+        self.detail = pd.concat([x.prepare_table() for x in self.folders])
         # sort by sequencing date, instrument, iLab, project name, sample name
-        mytable.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
-        #logging.debug('MyDemuxFolder: {}'.format(mytable.shape))
-        #logging.debug('MyDemuxFolder: {}'.format(mytable.head(2)))
-        return mytable
+        self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
+        # prepare an overview table at the project level
+        self.overview = self.detail.groupby(by=['iLab','project','platform','flowcell_id','date'])['PF Clusters'].agg('sum').reset_index(name='PF Clusters')
+        # sort the overview table by date and iLab
+        self.overview.sort_values(by=['date','iLab'], inplace=True)
+        #logging.debug('MyDemuxFolder: {}'.format(self.detail.shape))
+        #logging.debug('MyDemuxFolder: {}'.format(self.detail.head(2)))
 
     def write_df_to_excel(self, mydf, outdir, outprefix):
         """write a DataFrame to an excel file, with sheets by months/overview"""
@@ -754,34 +762,33 @@ class MyDemuxAuto:
         # 1) one excel per year, one spread sheet per month
         # 2) include an overview spread sheet storing the total reads per project
 
-        # a valid demux auto?
-        if not self.valid:
+        # overview/details tables ready?
+        if self.detail is None or self.overview is None:
             return None
-        # combine information into a table
-        mytable = self.prepare_table()
         # separate data by year and write to file
-        mytable['year'] = mytable['date'].dt.year
+        self.detail['year'] = self.detail['date'].dt.year
         # sort data by year
-        mytable.sort_values(by=['year'], inplace=True)
-        mytable.groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
+        #self.detail.sort_values(by=['year'], inplace=True)
+        self.detail.groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
 
     def to_file(self, outdir, outprefix='GRCF.demux.summary', outext='txt'):
         """combine information and write to file"""
-        # a valid demux auto?
-        if not self.valid:
+        # overview/details tables ready?
+        if self.detail is None or self.overview is None:
             return None
         # write to file
         if outext == 'xlsx':
             self.to_excel(outdir, outprefix)
             logging.info('write MyDemuxAuto to excel files: {}'.format(os.path.join(outdir, '{}.XXXX.xlsx'.format(outprefix))))
         else:
-            # combine information into a table
-            mytable = self.prepare_table()
-            outfile = os.path.join(outdir, '{}.{}'.format(outprefix, outext))
+            detail_file = os.path.join(outdir, '{}.details.{}'.format(outprefix, outext))
+            overview_file = os.path.join(outdir, '{}.overview.{}'.format(outprefix, outext))
             if outext == 'csv':
-                mytable.to_csv(outfile, sep=',', index=False)
+                self.detail.to_csv(detail_file, sep=',', index=False)
+                self.overview.to_csv(overview_file, sep=',', index=False)
             elif outext == 'tsv' or outext == 'txt':
-                mytable.to_csv(outfile, sep='\t', index=False)
+                self.detail.to_csv(detail_file, sep='\t', index=False)
+                self.overview.to_csv(overview_file, sep='\t', index=False)
             else:
                 logging.warning('MyDemuxFolder: Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
                 return None
@@ -804,6 +811,7 @@ def test_MyDemuxUnit():
     #du.infer_seq_type()
     #du.load_report()
     du.infer_all()
+    du.prepare_table()
     du.to_file('/tmp/test.txt')
     print(du)
     #print(du.summary.columns)
@@ -823,6 +831,7 @@ def test_MyDemuxRun():
     #dr.extract_demux_units()
     #dr.prepare_table()
     dr.infer_all()
+    dr.prepare_table()
     dr.to_file('/tmp/test.run.txt')
     print(dr)
     #print(len(dr.units))
@@ -881,6 +890,7 @@ def run_MyDemuxAuto():
         '/genome2/GRCF_data_archive/HiSeq4000','/genome2/GRCF_data_archive/NextSeq500']
     da = MyDemuxAuto(server_folders)
     da.extract_demux_folders()
+    da.prepare_table()
     da.to_file('/data/seq/tmp','GRCF.demux.summary','xlsx')
     da.to_file('/data/seq/tmp','GRCF.demux.summary','txt')
 
