@@ -118,6 +118,8 @@ class MyDemuxUnit:
                 self.project = folder_name
                 logging.warning('MyDemuxUnit: Failed to infer iLab id: {}'.format(self.fastq_folder))
                 logging.debug('MyDemuxUnit: Infer project info: {}'.format(self.project))
+            # save ilab as an integer
+            self.ilab = int(self.ilab)
 
     def infer_report_file(self):
         """guess demux report html file if not provided"""
@@ -704,7 +706,7 @@ class MyDemuxAuto:
             # add some cell formats
             format_int = workbook.add_format({'num_format': '#,##'})
             # overview table
-            overview.to_excel(writer, sheet_name='overview', index=False)
+            overview.sort_values(by=['date','platform','iLab','project']).to_excel(writer, sheet_name='overview', index=False)
             # apply format to sheet 'overview'
             worksheet = writer.sheets['overview']
             worksheet.set_column('B:B', 20)
@@ -720,7 +722,7 @@ class MyDemuxAuto:
                 select_month = (mydf['month'] == m+1)
                 if select_month.sum() > 0:
                     sheet_name = self.months[m+1]
-                    mydf[select_month][self.columns].to_excel(writer, sheet_name=sheet_name, index=False)
+                    mydf[select_month][self.columns].sort_values(by=['date','platform','iLab','project','Sample']).to_excel(writer, sheet_name=sheet_name, index=False)
                     # apply format to current sheet
                     worksheet = writer.sheets[sheet_name]
                     worksheet.set_column('B:B', 15)
