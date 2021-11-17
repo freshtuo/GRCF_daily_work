@@ -483,6 +483,7 @@ class MyDemuxRun:
             logging.debug('MyDemuxRun: {}'.format(folder))
             tunit = MyDemuxUnit(folder, self.fcid)
             tunit.infer_all()
+            tunit.prepare_table()
             if tunit.valid:
                 self.units.append(tunit)
         # at least one valid unit collected?
@@ -520,7 +521,7 @@ class MyDemuxRun:
         if not self.valid or self.detail is not None:
             return None
         # merge information from each demux unit
-        self.detail = pd.concat([x.prepare_table() for x in self.units])
+        self.detail = pd.concat([x.detail for x in self.units])
         # add additional information
         # platform
         self.detail.insert(2, 'platform', [self.platform] * self.detail.shape[0])
@@ -602,6 +603,7 @@ class MyDemuxFolder:
             logging.info('[Run]\t{}'.format(folder))
             trun = MyDemuxRun(os.path.join(self.server_folder,folder))
             trun.infer_all()
+            trun.prepare_table()
             if trun.valid:
                 self.runs.append(trun)
             #logging.debug('MyDemuxFolder: {}'.format(trun))
@@ -616,7 +618,7 @@ class MyDemuxFolder:
         if not self.valid or self.detail is not None:
             return None
         # merge information from each demux run
-        self.detail = pd.concat([x.prepare_table() for x in self.runs])
+        self.detail = pd.concat([x.detail for x in self.runs])
         # sort by sequencing date, instrument, iLab, project name, sample name
         self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         #logging.debug('MyDemuxFolder: {}'.format(self.detail.shape))
@@ -675,6 +677,7 @@ class MyDemuxAuto:
         for folder in self.server_folder_list:
             tfolder = MyDemuxFolder(folder)
             tfolder.extract_demux_runs()
+            tfolder.prepare_table()
             if tfolder.valid:
                 self.folders.append(tfolder)
             #logging.debug('MyDemuxFolder: {}'.format(tfolder))
@@ -689,7 +692,7 @@ class MyDemuxAuto:
         if not self.valid or self.detail is not None or self.overview is not None:
             return None
         # merge information from all demux folders
-        self.detail = pd.concat([x.prepare_table() for x in self.folders])
+        self.detail = pd.concat([x.detail for x in self.folders])
         # sort by sequencing date, instrument, iLab, project name, sample name
         self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
         # prepare an overview table at the project level
@@ -790,9 +793,9 @@ class MyDemuxAuto:
                 self.detail.to_csv(detail_file, sep='\t', index=False)
                 self.overview.to_csv(overview_file, sep='\t', index=False)
             else:
-                logging.warning('MyDemuxFolder: Unsupported output file extension: {}'.format(outfile.split('.')[-1]))
+                logging.warning('MyDemuxFolder: Unsupported output file extension: {}'.format(outprefix))
                 return None
-            logging.info('write MyDemuxAuto to file: {}'.format(outfile))
+            logging.info('write MyDemuxAuto to file: {}{}{}.XXX.{}'.format(outdir,os.sep,outprefix,outext))
 
     def __repr__(self):
         """print info for a demux auto"""
