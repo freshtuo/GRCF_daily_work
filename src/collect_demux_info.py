@@ -653,7 +653,7 @@ class MyDemuxFolder:
 class MyDemuxAuto:
     """Class for saving info on multiple server locations"""
 
-    def __init__(self, server_folder_list, detail_table=None, overview_table=None):
+    def __init__(self, server_folder_list, detail_table=None, overview_table=None, existing_detail_table=None, existing_overview_table=None):
         """class constructor"""
         # a list of server folders to screen
         self.server_folder_list = server_folder_list
@@ -663,10 +663,18 @@ class MyDemuxAuto:
         self.detail = detail_table
         # overview data table
         self.overview = overview_table
-        # columns to include
-        self.columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len',\
+        # existing detailed data table
+        self.exist_detail = existing_detail_table
+        # existing overview data table
+        self.exist_overview = existing_overview_table
+        # years having new data
+        self.new_years = []
+        # columns to include for the details table
+        self.detail_columns = ['iLab','project','platform','flowcell_id','date','seqtype','read1len','read2len',\
             'Sample','Barcode sequence','num_lanes','PF Clusters','Yield (Mbases)','% >= Q30bases',\
             'run_seqtype','run_read1len','run_read2len','run_index1len','run_index2len']
+        # columns to include for the overview table
+        self.overview_columns = ['iLab','project','platform','flowcell_id','date','PF Clusters']
         # month abbr.
         self.months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
         # a valid demux auto for output?
@@ -702,6 +710,28 @@ class MyDemuxAuto:
         #logging.debug('MyDemuxFolder: {}'.format(self.detail.shape))
         #logging.debug('MyDemuxFolder: {}'.format(self.detail.head(2)))
 
+    def merge_to_existing_table(self):
+        """merge detail/overview table into the existing tables"""
+        # existing detail/overview data tables?
+        if self.exist_detail is None or self.exist_overview is None:
+            return None
+        # look for new demux units in the overview data table
+        self.overview['eid'] = self.overview.apply(lambda x:'{}#{}#{}#{}#{}'.format(x['iLab'],x['project'],x['platform'],x['flowcell_id'],x['date']), axis=1)
+        self.exist_overview['eid'] = self.exist_overview.apply(lambda x:'{}#{}#{}#{}#{}'.format(x['iLab'],x['project'],x['platform'],x['flowcell_id'],x['date']), axis=1)
+        new_overview = self.overview[~self.overview['eid'].isin(self.exist_overview['eid'].tolist())]
+        # update overview data table
+        self.overview = pd.concat([self.exist_overview, new_overview], ignore_index=True)
+        # sort the overview table by date and iLab
+        self.overview.sort_values(by=['date','iLab'], inplace=True)
+        # subset new samples out of the details data table
+        self.detail['eid'] = self.detail.apply(lambda x:'{}#{}#{}#{}#{}'.format(x['iLab'],x['project'],x['platform'],x['flowcell_id'],x['date']), axis=1)
+        new_detail = self.detail[self.detail['eid'].isin(new_overview['eid'].tolist())]
+        self.detail = pd.concat([self.exist_detail[self.detail_columns], new_detail[self.detail_columns]], ignore_index=True)
+        # sort by sequencing date, instrument, iLab, project name, sample name
+        self.detail.sort_values(by=['date','platform','iLab','project','Sample'], inplace=True)
+        # figure out which year needs to be updated
+        self.new_years.extend(list(set(new_detail['date'].dt.year.tolist())))
+
     def write_df_to_excel(self, mydf, outdir, outprefix):
         """write a DataFrame to an excel file, with sheets by months/overview"""
         # prepare an overview table at the project level
@@ -717,7 +747,7 @@ class MyDemuxAuto:
             # add some cell formats
             format_int = workbook.add_format({'num_format': '#,##'})
             # overview table
-            overview.sort_values(by=['date','platform','iLab','project']).to_excel(writer, sheet_name='overview', index=False)
+            overview[self.overview_columns].sort_values(by=['date','platform','iLab','project']).to_excel(writer, sheet_name='overview', index=False)
             # apply format to sheet 'overview'
             worksheet = writer.sheets['overview']
             worksheet.set_column('B:B', 20)
@@ -733,7 +763,7 @@ class MyDemuxAuto:
                 select_month = (mydf['month'] == m+1)
                 if select_month.sum() > 0:
                     sheet_name = self.months[m+1]
-                    mydf[select_month][self.columns].sort_values(by=['date','platform','iLab','project','Sample']).to_excel(writer, sheet_name=sheet_name, index=False)
+                    mydf[select_month][self.detail_columns].sort_values(by=['date','platform','iLab','project','Sample']).to_excel(writer, sheet_name=sheet_name, index=False)
                     # apply format to current sheet
                     worksheet = writer.sheets[sheet_name]
                     worksheet.set_column('B:B', 15)
@@ -770,9 +800,11 @@ class MyDemuxAuto:
             return None
         # separate data by year and write to file
         self.detail['year'] = self.detail['date'].dt.year
-        # sort data by year
-        #self.detail.sort_values(by=['year'], inplace=True)
-        self.detail.groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
+        # update on existing data?
+        if self.exist_overview is not None:
+            self.detail[self.detail['year'].isin(self.new_years)].groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
+        else:
+            self.detail.groupby(by='year').apply(self.write_df_to_excel, outdir=outdir, outprefix=outprefix)
 
     def to_file(self, outdir, outprefix='GRCF.demux.summary', outext='txt'):
         """combine information and write to file"""
@@ -787,11 +819,11 @@ class MyDemuxAuto:
             detail_file = os.path.join(outdir, '{}.details.{}'.format(outprefix, outext))
             overview_file = os.path.join(outdir, '{}.overview.{}'.format(outprefix, outext))
             if outext == 'csv':
-                self.detail.to_csv(detail_file, sep=',', index=False)
-                self.overview.to_csv(overview_file, sep=',', index=False)
+                self.detail[self.detail_columns].to_csv(detail_file, sep=',', index=False)
+                self.overview[self.overview_columns].to_csv(overview_file, sep=',', index=False)
             elif outext == 'tsv' or outext == 'txt':
-                self.detail.to_csv(detail_file, sep='\t', index=False)
-                self.overview.to_csv(overview_file, sep='\t', index=False)
+                self.detail[self.detail_columns].to_csv(detail_file, sep='\t', index=False)
+                self.overview[self.overview_columns].to_csv(overview_file, sep='\t', index=False)
             else:
                 logging.warning('MyDemuxFolder: Unsupported output file extension: {}'.format(outprefix))
                 return None
@@ -883,17 +915,29 @@ def setup_logging(logfile, level=logging.INFO):
 def run_MyDemuxAuto():
     """scan GRCF server demux folders"""
     # run on the gc6 server
+    #server_folders = ['/data/seq/NovaSeq6000','/scratch/seq_data/NovaSeq6000','/data/seq/gc7_demux_runs',\
+    #    '/gc7-data/NovaSeq6000','/gc7-data/NextSeq500',\
+    #    '/gc5/NextSeq500','/gc5/NovaSeq6000',\
+    #    '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500','/gc4/HiSeq2500_new/flowcellA','/gc4/HiSeq2500_new/flowcellB',\
+    #    '/gc-archive2/gc4-backup/HiSeq4000/flowcellA','/gc-archive2/gc4-backup/GRCF_data_archive/HiSeq4000',\
+    #    '/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq2000','/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq500',\
+    #    '/gc-archive2/gc5-backup/GRCF_data_archive/NovaSeq6000','/genome2/GRCF_data_archive/HiSeq2500',\
+    #    '/genome2/GRCF_data_archive/HiSeq4000','/genome2/GRCF_data_archive/NextSeq500']
     server_folders = ['/data/seq/NovaSeq6000','/scratch/seq_data/NovaSeq6000','/data/seq/gc7_demux_runs',\
         '/gc7-data/NovaSeq6000','/gc7-data/NextSeq500',\
         '/gc5/NextSeq500','/gc5/NovaSeq6000',\
-        '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500','/gc4/HiSeq2500_new/flowcellA','/gc4/HiSeq2500_new/flowcellB',\
-        '/gc-archive2/gc4-backup/HiSeq4000/flowcellA','/gc-archive2/gc4-backup/GRCF_data_archive/HiSeq4000',\
-        '/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq2000','/gc-archive2/gc4-backup/GRCF_data_archive/NextSeq500',\
-        '/gc-archive2/gc5-backup/GRCF_data_archive/NovaSeq6000','/genome2/GRCF_data_archive/HiSeq2500',\
-        '/genome2/GRCF_data_archive/HiSeq4000','/genome2/GRCF_data_archive/NextSeq500']
-    da = MyDemuxAuto(server_folders)
+        '/gc4/NextSeq2000/NextSeq2000','/gc4/NextSeq500']
+    # read in the existing detail/overview tables
+    exist_detail = pd.read_table('/data/seq/tmp/GRCF.demux.summary.details.txt', header=0, sep='\t', low_memory=False)
+    exist_overview = pd.read_table('/data/seq/tmp/GRCF.demux.summary.overview.txt', header=0, sep='\t', low_memory=False)
+    # fix date format so that it matches with the current tables
+    exist_overview['date'] = pd.to_datetime(exist_overview['date'], format="%Y-%m-%d")
+    exist_detail['date'] = pd.to_datetime(exist_detail['date'], format="%Y-%m-%d")
+    # create a MyDemuxAuto object
+    da = MyDemuxAuto(server_folders, None, None, exist_detail, exist_overview)
     da.extract_demux_folders()
     da.prepare_table()
+    da.merge_to_existing_table()
     da.to_file('/data/seq/tmp','GRCF.demux.summary','xlsx')
     da.to_file('/data/seq/tmp','GRCF.demux.summary','txt')
 
