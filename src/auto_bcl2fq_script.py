@@ -63,7 +63,7 @@ class MyDemux:
         ## illegal characters (regular expression)
         #self.ilch = """[\?\(\)\[\]/\\=+<>:;"'\,\*\^|&\. ]"""
         # unusual characters (regular expression)
-        self.nmch = '[^A-Z,a-z,0-9,\_,\-]'
+        self.nmch = '[^A-Z,a-z,0-9,\_,\-,\+]'
         # original columns in the samplesheet sample table
         self.orig_columns = []
         # columns to check illegal characters
@@ -329,14 +329,29 @@ class MyDemux:
         # infer mask
         mask = []
         if request_seq_type:# non-empty string
-            tpat = search('([^\d]+)(\d+)', request_seq_type)
-            if not tpat:# unknown pattern
+            # pattern A: 58+8+8+151
+            tpatA = search('(\d+)\+(\d+)\+(\d+)\+(\d+)', request_seq_type)
+            # pattern B: PE50 or SR100
+            tpatB = search('([^\d]+)(\d+)', request_seq_type)
+            # get requested read length
+            read_1_len = read_2_len = 0
+            if tpatA:
+                r1,i1,i2,r2 = tpatA.groups()
+                read_1_len = int(r1)
+                read_2_len = int(r2)
+                index_len = int(i1)
+                index2_len = int(i2)
+            elif tpatB:
+                sp,rlen = tpatB.groups()
+                read_1_len = int(rlen)
+                if sp != 'PE':# single-end
+                    read_2_len = int(rlen)
+            else:# unknown pattern
                 print('failed.\nFailed to get requested sequencing read bases')
                 sys.exit(13)
-            sp,rlen = tpat.groups()
             # add read 1
             if self.read_1_len > 0:
-                mask.append(self.prepare_base_mask(self.read_1_len, int(rlen), False))
+                mask.append(self.prepare_base_mask(self.read_1_len, read_1_len, False))
             # add index 1
             if self.index_1_len > 0:
                 mask.append(self.prepare_base_mask(self.index_1_len, index_len, True))
@@ -345,7 +360,7 @@ class MyDemux:
                 mask.append(self.prepare_base_mask(self.index_2_len, index2_len, True))
             # add read 2
             if self.read_2_len > 0:
-                mask.append(self.prepare_base_mask(self.read_2_len, int(rlen), False))
+                mask.append(self.prepare_base_mask(self.read_2_len, read_2_len, False))
         else:# empty string
             # add read 1
             if self.read_1_len > 0:
