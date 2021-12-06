@@ -344,7 +344,7 @@ class MyDemux:
             elif tpatB:
                 sp,rlen = tpatB.groups()
                 read_1_len = int(rlen)
-                if sp != 'PE':# single-end
+                if sp == 'PE':# pair-end
                     read_2_len = int(rlen)
             else:# unknown pattern
                 print('failed.\nFailed to get requested sequencing read bases')
