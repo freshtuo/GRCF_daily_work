@@ -108,12 +108,16 @@ class MyDemux:
         # extract read length info
         for x in root.iter(r1id):
             self.read_1_len = int(x.text)
+            break
         for x in root.iter(r2id):
             self.read_2_len = int(x.text)
+            break
         for x in root.iter(i1id):
             self.index_1_len = int(x.text)
+            break
         for x in root.iter(i2id):
             self.index_2_len = int(x.text)
+            break
         # do we have length for all reads?
         if self.read_1_len == -1:
             print('failed.\nFailed to get read 1 length.')
