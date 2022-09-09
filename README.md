@@ -69,4 +69,29 @@ optional arguments:
                         sequencing platform
 </pre>
 
+3. script to examining conflicting index sequences in the samplesheet file
+   before mixing samples and loading them to the instrument
+
+<pre>
+usage: review_samplesheet_index.py [-h] [-v] -i [samplesheet_file] [-l
+[log_file]] [-d] [-o [updated_samplesheet_file]] [-t [tenx_dir]] [-r
+[tenx_idx_file]]
+
+Given a samplesheet, check index sequence conflicts.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         show program's version number and exit
+  -i [samplesheet_file], --samplesheet [samplesheet_file]
+                        samplesheet file
+  -l [log_file], --log [log_file]
+                        log file
+  -d, --detail          output details
+  -o [updated_samplesheet_file], --updatedsheet [updated_samplesheet_file]
+                        updated samplesheet file for manual check
+  -t [tenx_dir], --tenxdir [tenx_dir]
+                        load 10X index sequences in the given folder
+  -r [tenx_idx_file], --tenxidx [tenx_idx_file]
+                        load 10X index sequences from the given file
+</pre>
 
