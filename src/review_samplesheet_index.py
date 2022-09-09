@@ -288,7 +288,6 @@ def main():
     """call me to get started!"""
     # load arguments
     args = get_arguments()
-    print(args.updatedsheetfile)
     # set up logging
     root_logger = setup_logging(args.logfile, level=logging.INFO)
     #root_logger = setup_logging(args.logfile, level=logging.DEBUG)
