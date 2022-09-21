@@ -44,6 +44,8 @@ class MySampleSheet:
         self.i7_index_seq = 'index'
         self.i5_index_id = 'I5_Index_ID'
         self.i5_index_seq = 'index2'
+        # column to search for 10X index ids
+        self.si_index_id = 'index'
         # output details?
         self.detail = args.detail
         # updated samplesheet file
@@ -164,9 +166,14 @@ class MySampleSheet:
     def update_index(self):
         """update the missing 10X index in the samplesheet"""
         logging.info('Filling up missing 10X index sequences.')
-        data_to_fix = self.table[self.table[self.i7_index_id].str.contains('^SI')]
-        data_to_keep = self.table[~self.table[self.i7_index_id].str.contains('^SI')]
+        # divide sample sheet into two parts: with and without the need to fix index sequences
+        data_to_fix = self.table[self.table[self.si_index_id].str.contains('^SI')]
+        data_to_keep = self.table[~self.table[self.si_index_id].str.contains('^SI')]
+        # copy index id to the right column
+        data_to_fix[self.i7_index_id] = data_to_fix[self.si_index_id]
+        # fill in index sequences
         data_to_fix = data_to_fix.drop(columns=['index','index2']).merge(self.tenx_idx, how='left', on=self.i7_index_id)
+        # merge two parts
         self.fixed_table = pd.concat([data_to_keep, data_to_fix[data_to_keep.columns]])
 
     def screen_duplicate_index(self, td):
