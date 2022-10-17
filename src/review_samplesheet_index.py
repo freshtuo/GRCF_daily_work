@@ -209,7 +209,7 @@ class MySampleSheet:
         # print out identical indexes in any
         i7_dist_same = [x for x in i7_dist if x[-1] == 0]
         if i7_dist_same:
-            logging.error('identical i7 indexes found in lane {} after trimming bases to the same length.'.format(td['Lane'].iloc[0]))
+            logging.error('identical i7 indexes found in lane {} after trimming bases to the same length. Need manual check to determine whether or not this is a problem.'.format(td['Lane'].iloc[0]))
             logging.error('identical i7 indexes:\n'+'\n'.join(['idxA: {}; idxB: {}; distance: {}'.format(x[2],x[3],x[4]) for x in i7_dist_same]))
         # print out close indexes if any
         i7_dist_close = [x for x in i7_dist if x[-1] < 3]
@@ -227,7 +227,7 @@ class MySampleSheet:
         # print out identical indexes in any
         i5_dist_same = [x for x in i5_dist if x[-1] == 0]
         if i5_dist_same:
-            logging.error('identical i5 indexes found in lane {} after trimming bases to the same length.'.format(td['Lane'].iloc[0]))
+            logging.error('identical i5 indexes found in lane {} after trimming bases to the same length. Need manual check to determine whether or not this is a problem.'.format(td['Lane'].iloc[0]))
             logging.error('identical i5 indexes:\n'+'\n'.join(['idxA: {}; idxB: {}; distance: {}'.format(x[2],x[3],x[4]) for x in i5_dist_same]))
         # print out close indexes if any
         i5_dist_close = [x for x in i5_dist if x[-1] < 3]
