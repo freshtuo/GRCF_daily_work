@@ -187,7 +187,7 @@ class MyDemux:
         # calculate overall counts
         ##dup_counts = self.table.groupby(by=group).apply(lambda x: x.duplicated(column).sum()).reset_index(name='counts')
         # label each entry according to whether or not it's a duplicate
-        dup_marks = self.table.groupby(by=group, squeeze=True).apply(lambda x: x.duplicated(column))
+        dup_marks = self.table.groupby(by=group).apply(lambda x: x.duplicated(column)).squeeze()
         # depending on whether or not the samplesheet contains only a single lane
         # the processing is slightly different due to how groupby.apply deals with single group
         # https://github.com/pandas-dev/pandas/issues/5839
