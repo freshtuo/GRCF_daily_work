@@ -186,7 +186,11 @@ class MyEmail:
         """guess number of sequenced samples"""
         # search for fastq files
         # e.g. 10_S10_L001_R1_001.fastq.gz
-        sids = list(set([search('.*_S(\d+)_L00\d+_R1_001',tfile).groups()[0] for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]))
+        sids = []
+        if self.args.nolanesplitting:
+            sids = list(set([search('.*_S(\d+)_R1_001',tfile).groups()[0] for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]))
+        else:
+            sids = list(set([search('.*_S(\d+)_L00\d+_R1_001',tfile).groups()[0] for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]))
         # search for folders other than 'Summary' if failing to find *.fastq.gz
         if not sids:
             sids = [tfile for tfile in listdir(self.fastq_path) if isdir('{}/{}'.format(self.fastq_path,tfile)) and tfile != 'Summary']
@@ -467,6 +471,7 @@ def get_arguments():
     parser.add_argument('-p', '--print', action='store_true', help="""print settings.""")
     parser.add_argument('-x', '--suffix', help="""add a suffix to the end of email subject""")
     parser.add_argument('-n', '--note', default='', help="""include a note to the email main text.""")
+    parser.add_argument('-c', '--nolanesplitting', action='store_true', default=False, help="""FASTQ files are not split by lane""")
     return parser.parse_args()
 
 
