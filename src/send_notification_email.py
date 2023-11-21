@@ -11,6 +11,7 @@ import sys
 import smtplib
 import mimetypes
 import yaml
+import gzip
 
 import xml.etree.ElementTree as ET
 
@@ -67,7 +68,7 @@ class MyEmail:
         else:
             # initialize settings
             # 'run' section: sequencing run info
-            self.setdic['run'] = {'iLab':-1, 'libType':'', 'nSamples':0, 'instrument':'', 'seqType':'', 'readLen':[], 'date':''}
+            self.setdic['run'] = {'iLab':-1, 'libType':'', 'nSamples':0, 'instrument':'', 'seqType':'', 'readLen':[], 'date':'', 'plannedSeqType':'', 'plannedReadLen':[]}
             # 'user' section: user contact info
             self.setdic['user'] = {'name':'', 'email':'', 'piEmail':'', 'dataPath':''}
             # 'core' section: core contact info
@@ -137,8 +138,8 @@ class MyEmail:
                     return '{}/{}'.format(run_folder,tfile)
         return None
 
-    def infer_seqinfo(self):
-        """guess sequencing type and read length"""
+    def infer_planned_seqinfo(self):
+        """guess sequencing type and read length (on Sequencer)"""
         # tag available for the given sequencer?
         instrument = self.setdic['run']['instrument']
         if instrument not in self.tagdic:
@@ -190,14 +191,50 @@ class MyEmail:
                         read_length.append(int(x.text))
                     break
             # update info in settings
-            self.setdic['run']['readLen'] = read_length
+            self.setdic['run']['plannedReadLen'] = read_length
             if len(read_length) > 1:
-                self.setdic['run']['seqType'] = 'PE'
+                self.setdic['run']['plannedSeqType'] = 'PE'
             else:
-                self.setdic['run']['seqType'] = 'SR'
-            print('infer seqType: {}'.format(self.setdic['run']['seqType']))
-            print('infer readLen: {}'.format(read_length))
+                self.setdic['run']['plannedSeqType'] = 'SR'
+            print('infer plannedSeqType: {}'.format(self.setdic['run']['plannedSeqType']))
+            print('infer plannedReadLen: {}'.format(read_length))
         return None
+
+    def infer_read_length(self, fq_file):
+        """extract read length from a fastq file"""
+        if not exists(fq_file):
+            print('Fastq file does not exist: {}'.format(fq_file))
+            sys.exit(3)
+        with gzip.open(fq_file, 'rt') as fin:
+            tline = fin.readline()
+            tline = fin.readline().strip()
+            return len(tline)
+
+    def infer_project_seqinfo(self):
+        """guess sequencing type and read length for a given project (different from the planned setting on sequencer)"""
+        # grab information from the fastq data
+        # R1 files
+        r1_files = [tfile for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]
+        # R2 files
+        r2_files = [tfile for tfile in listdir(self.fastq_path) if search('R2_001\.fastq\.gz',tfile)]
+        # R3 files (only for scATACseq samples)
+        r3_files = [tfile for tfile in listdir(self.fastq_path) if search('R3_001\.fastq\.gz',tfile)]
+        # get read length
+        read_length = []
+        if r1_files:
+            read_length.append(self.infer_read_length(r1_files[0]))
+        if r3_files:
+            read_length.append(self.infer_read_length(r3_files[0]))
+        elif r2_files:
+            read_length.append(self.infer_read_length(r2_files[0]))
+        # update info in settings
+        self.setdic['run']['readLen'] = read_length
+        if len(read_length) > 1:
+            self.setdic['run']['seqType'] = 'PE'
+        else:
+            self.setdic['run']['seqType'] = 'SR'
+        print('infer seqType: {}'.format(self.setdic['run']['seqType']))
+        print('infer readLen: {}'.format(read_length))
 
     def infer_nsamples(self):
         """guess number of sequenced samples"""
@@ -276,7 +313,8 @@ class MyEmail:
         # iLab
         self.infer_ilab()
         # seqType & readLen
-        self.infer_seqinfo()
+        self.infer_planned_seqinfo()
+        self.infer_project_seqinfo()
         # nSamples
         self.infer_nsamples()
         # demuxSum
