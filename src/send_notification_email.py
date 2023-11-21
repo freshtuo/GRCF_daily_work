@@ -44,6 +44,7 @@ class MyEmail:
         self.instruments = ['NovaSeq6000','HiSeq4000','NextSeq500','NextSeq2000','MiSeq','NovaSeqXplus']
         # readlength tags used in xml file
         self.tagdic = {'NovaSeq6000':('Read1NumberOfCycles','Read2NumberOfCycles'),
+            'NovaSeqXplus':('Read1','Read2'),
             'HiSeq4000':('Read1','Read2'),
             'NextSeq500':('Read1','Read2'),
             'NextSeq2000':('Read1','Read2'),
@@ -172,12 +173,11 @@ class MyEmail:
                 #  </PlannedReads>
                 for x in root.iter('PlannedReads'):
                     for item in x:
-                        if item.get('ReadName') == 'Read1':
+                        if item.get('ReadName') == tag1:
                             read_length.append(int(item.get('Cycles')))
-                        elif item.get('ReadName') == 'Read2':
+                        elif item.get('ReadName') == tag2:
                             read_length.append(int(item.get('Cycles')))
             else:# neither MiSeq nor NovaSeqXplus
-                read_length = []
                 # get read 1 length
                 for x in root.iter(tag1):
                     if x.text != '0':
