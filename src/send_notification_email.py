@@ -489,7 +489,6 @@ def get_arguments():
     parser.add_argument('-x', '--suffix', help="""add a suffix to the end of email subject""")
     parser.add_argument('-n', '--note', default='', help="""include a note to the email main text.""")
     parser.add_argument('-c', '--nolanesplitting', action='store_true', default=False, help="""FASTQ files are not split by lane""")
-    parser.add_argument('-v', '--novaseqx', action='store_true', default=False, help="""sequenced on NovaSeqX, runfolder starts with 4-digit year""")
     return parser.parse_args()
 
 
