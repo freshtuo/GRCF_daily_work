@@ -42,7 +42,7 @@ class MyEmail:
         # commandline arguments
         self.args = args
         # available sequencers
-        self.instruments = ['NovaSeq6000','HiSeq4000','NextSeq500','NextSeq2000','MiSeq']
+        self.instruments = ['NovaSeq6000','HiSeq4000','NextSeq500','NextSeq2000','MiSeq','NovaSeqXplus']
         # readlength tags used in xml file
         self.tagdic = {'NovaSeq6000':('Read1NumberOfCycles','Read2NumberOfCycles'),
             'HiSeq4000':('Read1','Read2'),
@@ -94,11 +94,14 @@ class MyEmail:
 
     def infer_date(self):
         """guess sequencing date"""
-        # e.g. '210615_A00814_0436_BH7VLVDSX2'
+        # e.g. '210615_A00814_0436_BH7VLVDSX2' or 20231115_LH00376_0003_B22F3FKLT3
         tpat = search('/(\d+)_[a-zA-Z0-9\-]+_\d+', self.fastq_path)
         if tpat:
             date = tpat.groups()[0]
-            self.setdic['run']['date'] = '20{}_{}_{}'.format(date[:2], date[2:4], date[4:])
+            if self.setdic['run']['instrument'] == 'NovaSeqXplus':# 20231115_LH00376_0003_B22F3FKLT3
+                self.setdic['run']['date'] = '{}_{}_{}'.format(date[:4], date[4:6], date[6:])
+            else:# 210615_A00814_0436_BH7VLVDSX2
+                self.setdic['run']['date'] = '20{}_{}_{}'.format(date[:2], date[2:4], date[4:])
             print('Infer date: {}'.format(self.setdic['run']['date']))
 
     def infer_ilab(self):
@@ -160,7 +163,21 @@ class MyEmail:
                     if x.attrib['IsIndexedRead'] == 'N':# sample read, not index!
                         if x.attrib['NumCycles'] != '0':
                             read_length.append(int(x.attrib['NumCycles']))
-            else:# not MiSeq
+            elif instrument == 'NovaSeqXplus':
+                # e.g.
+                #  <PlannedReads>
+                #    <Read ReadName="Read1" Cycles="151" />
+                #    <Read ReadName="Index1" Cycles="10" />
+                #    <Read ReadName="Index2" Cycles="24" />
+                #    <Read ReadName="Read2" Cycles="151" />
+                #  </PlannedReads>
+                for x in root.iter('PlannedReads'):
+                    for item in x:
+                        if item.get('ReadName') == 'Read1':
+                            read_length.append(int(item.get('Cycles')))
+                        elif item.get('ReadName') == 'Read2':
+                            read_length.append(int(item.get('Cycles')))
+            else:# neither MiSeq nor NovaSeqXplus
                 read_length = []
                 # get read 1 length
                 for x in root.iter(tag1):
@@ -472,6 +489,7 @@ def get_arguments():
     parser.add_argument('-x', '--suffix', help="""add a suffix to the end of email subject""")
     parser.add_argument('-n', '--note', default='', help="""include a note to the email main text.""")
     parser.add_argument('-c', '--nolanesplitting', action='store_true', default=False, help="""FASTQ files are not split by lane""")
+    parser.add_argument('-v', '--novaseqx', action='store_true', default=False, help="""sequenced on NovaSeqX, runfolder starts with 4-digit year""")
     return parser.parse_args()
 
 
