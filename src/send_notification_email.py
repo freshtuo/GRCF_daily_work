@@ -14,11 +14,9 @@ import yaml
 import gzip
 
 import xml.etree.ElementTree as ET
+import os.path
 
 from os import listdir
-from os.path import exists
-from os.path import basename
-from os.path import isdir
 from time import time
 from time import localtime
 from time import asctime
@@ -61,7 +59,7 @@ class MyEmail:
         """load settings from a yaml file"""
         setting_file = self.args.setting
         # read from setting yaml if exists
-        if exists(setting_file):
+        if os.path.exists(setting_file):
             print('load settings from file {}\n'.format(setting_file))
             with open(setting_file, 'r') as fset:
                 self.setdic = yaml.safe_load(fset)
@@ -202,7 +200,7 @@ class MyEmail:
 
     def infer_read_length(self, fq_file):
         """extract read length from a fastq file"""
-        if not exists(fq_file):
+        if not os.path.exists(fq_file):
             print('Fastq file does not exist: {}'.format(fq_file))
             sys.exit(3)
         with gzip.open(fq_file, 'rt') as fin:
@@ -222,11 +220,11 @@ class MyEmail:
         # get read length
         read_length = []
         if r1_files:
-            read_length.append(self.infer_read_length(r1_files[0]))
+            read_length.append(self.infer_read_length(os.path.join(self.fastq_path, r1_files[0])))
         if r3_files:
-            read_length.append(self.infer_read_length(r3_files[0]))
+            read_length.append(self.infer_read_length(os.path.join(self.fastq_path, r3_files[0])))
         elif r2_files:
-            read_length.append(self.infer_read_length(r2_files[0]))
+            read_length.append(self.infer_read_length(os.path.join(self.fastq_path, r2_files[0])))
         # update info in settings
         self.setdic['run']['readLen'] = read_length
         if len(read_length) > 1:
@@ -247,7 +245,7 @@ class MyEmail:
             sids = list(set([search('.*_S(\d+)_L00\d+_R1_001',tfile).groups()[0] for tfile in listdir(self.fastq_path) if search('R1_001\.fastq\.gz',tfile)]))
         # search for folders other than 'Summary' if failing to find *.fastq.gz
         if not sids:
-            sids = [tfile for tfile in listdir(self.fastq_path) if isdir('{}/{}'.format(self.fastq_path,tfile)) and tfile != 'Summary']
+            sids = [tfile for tfile in listdir(self.fastq_path) if os.path.isdir('{}/{}'.format(self.fastq_path,tfile)) and tfile != 'Summary']
         # update info in settings
         if sids:
             self.setdic['run']['nSamples'] = len(sids)
@@ -283,7 +281,7 @@ class MyEmail:
         if self.args.location == 'aws':
             url_file = '{}/{}.aws_s3.transfer.URL'.format(logs_path, user_folder)
             # check file existence
-            if exists(url_file):
+            if os.path.exists(url_file):
                 with open(url_file, 'r') as furl:
                     tpat = search('^URL:\s*(.*)',furl.readline().strip())
                     if tpat:
@@ -292,7 +290,7 @@ class MyEmail:
         elif self.args.location == 'sftp':
             url_file = '{}/{}.sftp.path'.format(logs_path, user_folder)
             # check file existence
-            if exists(url_file):
+            if os.path.exists(url_file):
                 with open(url_file, 'r') as furl:
                     self.setdic['user']['dataPath'] = furl.readline().strip()
                     print('infer data path: {}'.format(self.setdic['user']['dataPath']))
@@ -301,9 +299,11 @@ class MyEmail:
         """infer settings based on fastq path, and overwrite the current one"""
         # fastq location assigned by user?
         if self.args.fastq is None:
+            print('Please provide the fastq folder and rerun!')
             return None
         # fastq location exists?
-        if not exists(self.fastq_path):
+        if not os.path.exists(self.fastq_path):
+            print('Failed to locate fastq folder: {}'.format(self.fastq_path))
             return None
         print('infer settings based on fastq path {}'.format(self.args.fastq))
         # instrument
@@ -329,11 +329,11 @@ class MyEmail:
         # write only if:
         # 1) the setting file does not exist
         # 2) or --overwrite option is on
-        if exists(setting_file) and (not self.args.overwrite):
+        if os.path.exists(setting_file) and (not self.args.overwrite):
             print('setting file already exists. use --overwrite to force writing to it!\n')
             return None
         else:
-            if not exists(setting_file):
+            if not os.path.exists(setting_file):
                 print('write settings to file {}\n'.format(setting_file))
             else:
                 print('overwrite setting file {}\n'.format(setting_file))
@@ -416,14 +416,14 @@ class MyEmail:
         if 'demuxSum' in self.setdic['attachments']:
             for sum_file in self.setdic['attachments']['demuxSum']:
                 # file exists?
-                if exists(sum_file):
+                if os.path.exists(sum_file):
                     demuxsum.append(sum_file)
         # other files
         other = []
         if 'other' in self.setdic['attachments']:
             for other_file in self.setdic['attachments']['other']:
                 # file exists?
-                if exists(other_file):
+                if os.path.exists(other_file):
                     other.append(other_file)
         # create email message
         if self.args.suffix is None:
@@ -444,7 +444,7 @@ class MyEmail:
                 ctype = 'application/octet-stream'
             maintype, subtype = ctype.split('/', 1)
             with open(dfile, 'rb') as fp:
-                self.msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=basename(dfile))
+                self.msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(dfile))
 
     def check_settings(self):
         """check settings before sending out email."""
