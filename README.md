@@ -100,7 +100,7 @@ optional arguments:
 <pre>
 usage: arrange_fastq.py [-h] [-v] -i [samplesheet_file] [-l [log_file]] [-c
 [V1FORMATFILE]] [-d [DEMUXFOLDER]] [-o [OUTFOLDER]] [-s] [-n] [-r
-[demux_summary_file]]
+[demux_summary_file]] [-q [MULTIQC]]
 
 Collect demux data processed by Illumina BCL Convert, pack fastq files and
 prepare summary reports for distribution.
@@ -122,5 +122,7 @@ optional arguments:
   -n, --no-run-script   generate link-file shell scripts without running them
   -r [demux_summary_file], --run-summary [demux_summary_file]
                         an overall demux summary by project
+  -q [MULTIQC], --multiqc [MULTIQC]
+                        multiqc excutable
 </pre>
 
