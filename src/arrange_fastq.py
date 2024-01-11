@@ -70,6 +70,15 @@ class MyBCLConvert:
 		self.demux_summary_file = args.sumfile
 		# multiqc executable
 		self.multiqc = args.multiqc
+		# run read cycle info (Dict)
+		self.cycles = {}
+		# run read cycle labels
+		self.read_1_label = 'Read1Cycles'
+		self.read_2_label = 'Read2Cycles'
+		self.index_1_label = 'Index1Cycles'
+		self.index_2_label = 'Index2Cycles'
+		# run override cycles (in case not provided in sample sheet)
+		self.override_cycles = None
 
 	def split_sections(self):
 		"""preprocess sample sheet: split info by sections"""
@@ -93,6 +102,20 @@ class MyBCLConvert:
 			# logging
 			logging.info('{} sections detected.'.format(len(self.sections)))
 
+	def infer_read_cycles(self):
+		"""infer read cycles from [Reads] section"""
+		if 'Reads' not in self.sections:
+			logging.error('Section Reads is unavailable.')
+		start, end = self.sections['Reads']
+		with open(self.sample_sheet_file, 'r') as fin:
+			for entry in fin.readlines()[start+1:end-1]:
+				attr = entry.split(',')[0].strip()
+				value = entry.split(',')[1].strip()
+				self.cycles[attr] = value
+		self.override_cycles = 'Y{};I{};I{};Y{}'.format(self.cycles[self.read_1_label], self.cycles[self.index_1_label], \
+			self.cycles[self.index_2_label], self.cycles[self.read_2_label])
+		logging.info('Infer run read cycles: {}.'.format(self.override_cycles))
+
 	def load_section_table(self, section_name):
 		"""load data from a given section into a DataFrame"""
 		if section_name not in self.sections:
@@ -114,8 +137,13 @@ class MyBCLConvert:
 			sys.exit(1)
 		# split info by sections
 		self.split_sections()
+		# info run read cycles
+		self.infer_read_cycles()
 		# extract samples by lane
 		self.lane_info = self.load_section_table('BCLConvert_Data')
+		# fill in OverrideCycles column in case it is not provided in sample sheet
+		if 'OverrideCycles' not in self.lane_info.columns:
+			self.lane_info['OverrideCycles'] = self.override_cycles
 		# extract samples by project
 		self.project_info = self.load_section_table('Cloud_Data')
 
@@ -362,7 +390,7 @@ def get_arguments():
 	"""fetch command line arguments."""
 	parser = ArgumentParser(description="""Collect demux data processed by Illumina BCL Convert, pack fastq files and prepare summary reports for distribution.""",
                             prog='arrange_fastq.py')
-	parser.add_argument("-v", "--version", action="version", version='%(prog)s v0.2')
+	parser.add_argument("-v", "--version", action="version", version='%(prog)s v0.3')
 	parser.add_argument("-i", "--samplesheet", nargs="?", required=True, help="samplesheet made on basespace", metavar="samplesheet_file", dest="samplesheetfile")
 	parser.add_argument("-l", "--log", nargs="?", default="review_samplesheet_index.log", help="log file", metavar="log_file", dest="logfile")
 	parser.add_argument("-c", "--v1format", nargs="?", help="convert samplesheet to v1 format", dest="v1formatfile")
