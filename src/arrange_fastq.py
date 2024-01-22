@@ -123,7 +123,9 @@ class MyBCLConvert:
 			sys.exit(2)
 		# read in table
 		start, end = self.sections[section_name]
-		df = pd.read_table(self.sample_sheet_file, sep=',', header=0, skiprows=start+1, skipfooter=self.nrow-end+1, engine='python')
+		df = pd.read_table(self.sample_sheet_file, sep=',', header=0, skiprows=start+1, skipfooter=self.nrow-end, engine='python')
+		# remove empty rows
+		df.dropna(axis=0, how='all', inplace=True)
 		# logging
 		logging.info('Load section {}: {}.'.format(section_name, df.shape))
 		return df
@@ -141,6 +143,8 @@ class MyBCLConvert:
 		self.infer_read_cycles()
 		# extract samples by lane
 		self.lane_info = self.load_section_table('BCLConvert_Data')
+		# fix data type for column 'Lane'
+		self.lane_info['Lane'] = self.lane_info['Lane'].astype('int32')
 		# fill in OverrideCycles column in case it is not provided in sample sheet
 		if 'OverrideCycles' not in self.lane_info.columns:
 			self.lane_info['OverrideCycles'] = self.override_cycles
@@ -437,8 +441,10 @@ def main():
 	# extract information from sample sheet file
 	d.get_sample_info()
 	##print(d.sections)
+	##print(d.lane_info.shape)
 	##print(d.lane_info.head())
 	##print(d.lane_info.tail())
+	##print(d.project_info.shape)
 	##print(d.project_info.head())
 	##print(d.project_info.tail())
 	# convert samplesheet to v1 format
