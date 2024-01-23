@@ -260,7 +260,7 @@ class MyEmail:
             report_folder = os.path.join(self.fastq_path, 'Summary')
             # report folder exists:
             if os.path.exists(report_folder):
-                demuxs.extend([x for x in listdir(report_folder) if search('^Demultiplex.*html$', x)])
+                demuxs.extend([os.path.join(report_folder, x) for x in listdir(report_folder) if search('^Demultiplex.*html$', x)])
         else:# bcl2fastq
             # get flowcell id
             run_folder = self.infer_run_folder()
