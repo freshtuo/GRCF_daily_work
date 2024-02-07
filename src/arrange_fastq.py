@@ -145,11 +145,15 @@ class MyBCLConvert:
 		self.lane_info = self.load_section_table('BCLConvert_Data')
 		# fix data type for column 'Lane'
 		self.lane_info['Lane'] = self.lane_info['Lane'].astype('int32')
+		# fix data type for column 'Sample_ID'
+		self.lane_info['Sample_ID'] = self.lane_info['Sample_ID'].astype('string')
 		# fill in OverrideCycles column in case it is not provided in sample sheet
 		if 'OverrideCycles' not in self.lane_info.columns:
 			self.lane_info['OverrideCycles'] = self.override_cycles
 		# extract samples by project
 		self.project_info = self.load_section_table('Cloud_Data')
+		# fix data type for column 'Sample_ID'
+		self.project_info['Sample_ID'] = self.project_info['Sample_ID'].astype('string')
 
 	def format_override_cycles(self, tx):
 		"""convert OverrideCycles to Description"""
@@ -252,7 +256,7 @@ class MyBCLConvert:
 			logging.error('Failed to locate demux fastq folder: {}.'.format(self.demux_fastq_folder))
 			sys.exit(6)
 		# extract demux stats table
-		self.demux_stats = pd.read_table(self.demux_stats_file, sep=',', header=0, low_memory=False).merge(\
+		self.demux_stats = pd.read_table(self.demux_stats_file, sep=',', header=0, low_memory=False, dtype={'SampleID':'string'}).merge(\
 			self.project_info[['Sample_ID','ProjectName']].rename(columns={'Sample_ID':'SampleID'}), on='SampleID', how='left')
 		logging.info('Load demux stats file: {}.'.format(self.demux_stats.shape))
 		# demux fastq files
