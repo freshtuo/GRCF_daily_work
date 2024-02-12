@@ -400,7 +400,7 @@ def get_arguments():
                             prog='arrange_fastq.py')
 	parser.add_argument("-v", "--version", action="version", version='%(prog)s v0.3')
 	parser.add_argument("-i", "--samplesheet", nargs="?", required=True, help="samplesheet made on basespace", metavar="samplesheet_file", dest="samplesheetfile")
-	parser.add_argument("-l", "--log", nargs="?", default="review_samplesheet_index.log", help="log file", metavar="log_file", dest="logfile")
+	parser.add_argument("-l", "--log", nargs="?", default="arrange_fastq.log", help="log file", metavar="log_file", dest="logfile"
 	parser.add_argument("-c", "--v1format", nargs="?", help="convert samplesheet to v1 format", dest="v1formatfile")
 	parser.add_argument("-d", "--demuxfolder", nargs="?", help="demux folder", dest="demuxfolder")
 	parser.add_argument("-o", "--outfolder", nargs="?", help="output folder containing re-arranged demux files", dest="outfolder")
