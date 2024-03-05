@@ -195,7 +195,7 @@ class MyBCLConvert:
 	def parse_fastq_files(self):
 		"""parse fastq files and extract sample/lane/read info"""
 		fastq_files = [x for x in os.listdir(self.demux_fastq_folder) if re.search("\.fastq\.gz$", x)]
-		seq_info = [re.search("(.*?)_S(\d+)_L00(\d+)_R(\d+)_001\.fastq\.gz", x).groups() for x in fastq_files]
+		seq_info = [re.search("(.*?)_S(\d+)_L00(\d+)_([RI]+\d+)_001\.fastq\.gz", x).groups() for x in fastq_files]
 		###print([x for x in seq_info if x[0] not in self.project_info['Sample_ID'].tolist()])
 		return pd.DataFrame({'Sample_ID':[x[0] for x in seq_info], 'SN':[x[1] for x in seq_info], 'Lane':[x[2] for x in seq_info], \
 			'Read':[x[3] for x in seq_info], 'Fastq_Folder':self.demux_fastq_folder, 'Fastq_File':fastq_files}).merge(\
@@ -363,6 +363,8 @@ class MyBCLConvert:
 		if self.skip_multqc is not None:
 			logging.info('Skip multiqc for projects: {}'.format(self.skip_multqc))
 			self.skip_multqc = self.skip_multqc.split(';')
+		else:
+			self.skip_multqc = []
 		with open(self.run_multiqc_script, 'w') as fs:
 			project_list = self.demux_fastqc_report_files['ProjectName'].unique()
 			for project in project_list:
@@ -407,7 +409,7 @@ def get_arguments():
                             prog='arrange_fastq.py')
 	parser.add_argument("-v", "--version", action="version", version='%(prog)s v0.3')
 	parser.add_argument("-i", "--samplesheet", nargs="?", required=True, help="samplesheet made on basespace", metavar="samplesheet_file", dest="samplesheetfile")
-	parser.add_argument("-l", "--log", nargs="?", default="arrange_fastq.log", help="log file", metavar="log_file", dest="logfile"
+	parser.add_argument("-l", "--log", nargs="?", default="arrange_fastq.log", help="log file", metavar="log_file", dest="logfile")
 	parser.add_argument("-c", "--v1format", nargs="?", help="convert samplesheet to v1 format", dest="v1formatfile")
 	parser.add_argument("-d", "--demuxfolder", nargs="?", help="demux folder", dest="demuxfolder")
 	parser.add_argument("-o", "--outfolder", nargs="?", help="output folder containing re-arranged demux files", dest="outfolder")
