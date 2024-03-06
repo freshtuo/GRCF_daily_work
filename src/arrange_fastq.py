@@ -10,6 +10,7 @@ import os
 import logging
 import subprocess
 
+from collections import Counter
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 
@@ -71,7 +72,7 @@ class MyBCLConvert:
 		# multiqc executable
 		self.multiqc = args.multiqc
 		# run read cycle info (Dict)
-		self.cycles = {}
+		self.cycles = Counter()
 		# run read cycle labels
 		self.read_1_label = 'Read1Cycles'
 		self.read_2_label = 'Read2Cycles'
@@ -112,8 +113,9 @@ class MyBCLConvert:
 		with open(self.sample_sheet_file, 'r') as fin:
 			for entry in fin.readlines()[start+1:end-1]:
 				attr = entry.split(',')[0].strip()
-				value = entry.split(',')[1].strip()
+				value = int(entry.split(',')[1].strip())
 				self.cycles[attr] = value
+		# self.cycles Counter(), thus no need to assign zero for missing read/index labels
 		self.override_cycles = 'Y{};I{};I{};Y{}'.format(self.cycles[self.read_1_label], self.cycles[self.index_1_label], \
 			self.cycles[self.index_2_label], self.cycles[self.read_2_label])
 		logging.info('Infer run read cycles: {}.'.format(self.override_cycles))
@@ -152,6 +154,11 @@ class MyBCLConvert:
 		# fill in OverrideCycles column in case it is not provided in sample sheet
 		if 'OverrideCycles' not in self.lane_info.columns:
 			self.lane_info['OverrideCycles'] = self.override_cycles
+		# fill in index columns in case they are not provided in sample sheet
+		if 'Index' not in self.lane_info.columns:
+			self.lane_info['Index'] = ''
+		if 'Index2' not in self.lane_info.columns:
+			self.lane_info['Index2'] = ''
 		# extract samples by project
 		self.project_info = self.load_section_table('Cloud_Data')
 		# fix data type for column 'Sample_ID'
