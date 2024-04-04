@@ -273,6 +273,8 @@ class MyBCLConvert:
 		logging.info('Collect fastq files: {}.'.format(self.demux_fastq_files.shape))
 		# demux fastqc report files
 		self.demux_fastqc_report_files = self.parse_fastqc_report_files()
+		# remove NA rows in fastqc report files
+		self.demux_fastqc_report_files = self.demux_fastqc_report_files[self.demux_fastqc_report_files['Fastqc_Report_File'].notna()]
 		logging.info('Collect fastqc report files: {}.'.format(self.demux_fastqc_report_files.shape))
 
 	def initialize_output_folders(self):
