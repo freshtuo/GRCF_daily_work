@@ -81,7 +81,7 @@ class MyBCLConvert:
 		# run override cycles (in case not provided in sample sheet)
 		self.override_cycles = None
 		# skip projects for multiqc
-		self.skip_multqc = args.skipmultqc
+		self.skip_multiqc = args.skipmultiqc
 
 	def split_sections(self):
 		"""preprocess sample sheet: split info by sections"""
@@ -369,15 +369,15 @@ class MyBCLConvert:
 		if self.output_folder is None:
 			return None
 		logging.info('Running multiqc to combine fastqc results by project.')
-		if self.skip_multqc is not None:
-			logging.info('Skip multiqc for projects: {}'.format(self.skip_multqc))
-			self.skip_multqc = self.skip_multqc.split(';')
+		if self.skip_multiqc is not None:
+			logging.info('Skip multiqc for projects: {}'.format(self.skip_multiqc))
+			self.skip_multiqc = self.skip_multiqc.split(',')
 		else:
-			self.skip_multqc = []
+			self.skip_multiqc = []
 		with open(self.run_multiqc_script, 'w') as fs:
 			project_list = self.demux_fastqc_report_files['ProjectName'].unique()
 			for project in project_list:
-				if project in self.skip_multqc:
+				if project in self.skip_multiqc:
 					continue
 				# subset by project
 				td = self.demux_fastqc_report_files[self.demux_fastqc_report_files['ProjectName'] == project]
@@ -426,7 +426,7 @@ def get_arguments():
 	parser.add_argument("-n", "--no-run-script", action='store_true', default=False, help="generate link-file shell scripts without running them", dest="norun")
 	parser.add_argument("-r", "--run-summary", nargs="?", default="demux_summary.html", help="an overall demux summary by project", metavar="demux_summary_file", dest="sumfile")
 	parser.add_argument("-q", "--multiqc", nargs="?", default="multiqc", help="multiqc excutable", dest="multiqc")
-	parser.add_argument("-k", "--skip-multiqc", nargs="?", help="list projects that you want to skip multiqc, separate projects by comma(;)", dest="skipmultqc")
+	parser.add_argument("-k", "--skip-multiqc", nargs="?", help="list projects that you want to skip multiqc, separate projects by comma(,)", dest="skipmultiqc")
 	return parser.parse_args()
 
 def setup_logging(logfile, level=logging.INFO):
