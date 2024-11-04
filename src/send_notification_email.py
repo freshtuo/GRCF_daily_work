@@ -253,19 +253,27 @@ class MyEmail:
 
     def infer_demuxsum(self):
         """guess demux summary html files"""
-        # get flowcell id
-        run_folder = self.infer_run_folder()
-        fcid = run_folder.split('/')[-1].split('_')[-1]
-        if self.setdic['run']['instrument'] not in ['NextSeq2000','MiSeq']:
-            fcid = fcid[1:]# the first letter refers to flowcell A or B
-        # get user folder
-        user_folder = self.fastq_path.split('/')[-1]
-        # locate report folder
         demuxs = []
-        for x in listdir('{}/Reports/html/{}'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid)):
-            if x in user_folder:# find it!
-                demuxs.append('{}/Reports/html/{}/{}/all/all/lane.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
-                demuxs.append('{}/Reports/html/{}/{}/all/all/laneBarcode.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
+        # demux by BCL Convert?
+        if self.args.bclconvert:# BCL Convert
+            # report folder
+            report_folder = os.path.join(self.fastq_path, 'Summary')
+            # report folder exists:
+            if os.path.exists(report_folder):
+                demuxs.extend([os.path.join(report_folder, x) for x in listdir(report_folder) if search('^Demultiplex.*html$', x)])
+        else:# bcl2fastq
+            # get flowcell id
+            run_folder = self.infer_run_folder()
+            fcid = run_folder.split('/')[-1].split('_')[-1]
+            if self.setdic['run']['instrument'] not in ['NextSeq2000','MiSeq']:
+                fcid = fcid[1:]# the first letter refers to flowcell A or B
+            # get user folder
+            user_folder = self.fastq_path.split('/')[-1]
+            # locate report folder
+            for x in listdir('{}/Reports/html/{}'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid)):
+                if x in user_folder:# find it!
+                    demuxs.append('{}/Reports/html/{}/{}/all/all/lane.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
+                    demuxs.append('{}/Reports/html/{}/{}/all/all/laneBarcode.html'.format('/'.join(self.fastq_path.split('/')[:-1]), fcid, x))
         # update info in settings
         if demuxs:
             self.setdic['attachments']['demuxSum'] = demuxs
@@ -556,6 +564,7 @@ def get_arguments():
     parser.add_argument('-x', '--suffix', help="""add a suffix to the end of email subject""")
     parser.add_argument('-n', '--note', default='', help="""include a note to the email main text.""")
     parser.add_argument('-c', '--nolanesplitting', action='store_true', default=False, help="""FASTQ files are not split by lane""")
+    parser.add_argument('-r', '--bclconvert', action='store_true', default=False, help="""demux by BCL Convert""", dest="bclconvert")
     return parser.parse_args()
 
 

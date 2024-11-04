@@ -97,6 +97,11 @@ class MyDemux:
             r2id = 'Read2'
             i1id = 'Index1'
             i2id = 'Index2'
+        elif self.platform == 'novaseqxplus':
+            r1id = 'Read1'
+            r2id = 'Read2'
+            i1id = 'Index1'
+            i2id = 'Index2'
         # run parameter file exists?
         if not exists(run_para_file):
             print('failed.\nUnable to read the run parameter file: {}'.format(run_para_file))
@@ -106,18 +111,30 @@ class MyDemux:
         # get root
         root = tree.getroot()
         # extract read length info
-        for x in root.iter(r1id):
-            self.read_1_len = int(x.text)
-            break
-        for x in root.iter(r2id):
-            self.read_2_len = int(x.text)
-            break
-        for x in root.iter(i1id):
-            self.index_1_len = int(x.text)
-            break
-        for x in root.iter(i2id):
-            self.index_2_len = int(x.text)
-            break
+        if self.platform == 'novaseqxplus':
+            for x in root.iter('PlannedReads'):
+                for item in x:
+                    if item.get('ReadName') == r1id:
+                        self.read_1_len = int(item.get('Cycles'))
+                    elif item.get('ReadName') == r2id:
+                        self.read_2_len = int(item.get('Cycles'))
+                    elif item.get('ReadName') == i1id:
+                        self.index_1_len = int(item.get('Cycles'))
+                    elif item.get('ReadName') == i2id:
+                        self.index_2_len = int(item.get('Cycles'))
+        else:# other platforms
+            for x in root.iter(r1id):
+                self.read_1_len = int(x.text)
+                break
+            for x in root.iter(r2id):
+                self.read_2_len = int(x.text)
+                break
+            for x in root.iter(i1id):
+                self.index_1_len = int(x.text)
+                break
+            for x in root.iter(i2id):
+                self.index_2_len = int(x.text)
+                break
         # do we have length for all reads?
         if self.read_1_len == -1:
             print('failed.\nFailed to get read 1 length.')
@@ -439,7 +456,7 @@ def get_arguments():
     parser.add_argument("-t", "--stringent", action="store_true", required=False, default=False, help="stringent mode: no mismatches allowed for lanes with multiple index types", dest="stringent")
     parser.add_argument("-f", "--force", action="store_true", required=False, default=False, help="whether or not to overwrite output script if existing", dest="force")
     parser.add_argument("-n", "--no-lane-splitting", action="store_true", required=False, default=False, help="whether or not to add --no-lane-splitting option to shell script", dest="nosplit")
-    parser.add_argument("-p", "--platform", nargs="?", required=False, default="novaseq", choices=["hiseq","nextseq500","nextseq2000","novaseq"], help="sequencing platform", dest="platform")
+    parser.add_argument("-p", "--platform", nargs="?", required=False, default="novaseq6000", choices=["hiseq","nextseq500","nextseq2000","novaseq6000","novaseqxplus"], help="sequencing platform", dest="platform")
     return parser.parse_args()
 
 def main():
