@@ -71,7 +71,7 @@ class MyEmail:
             # 'user' section: user contact info
             self.setdic['user'] = {'name':'', 'email':'', 'piEmail':'', 'dataPath':''}
             # 'core' section: core contact info
-            self.setdic['core'] = {'name':'Adrian', 'fromEmail':'yit2001@med.cornell.edu', 'ccEmails':['yit2001@med.cornell.edu', 'taz2008@med.cornell.edu']}
+            self.setdic['core'] = {'name':'Adrian', 'fromEmail':'yit2001@med.cornell.edu', 'ccEmails':['GenomicsCoreFacility@med.cornell.edu']}
             # 'attachments' section: files to attach
             self.setdic['attachments'] = {'demuxSum':[], 'other':[]}
         # user assigned library type?
@@ -287,6 +287,15 @@ class MyEmail:
                     if tpat:
                         self.setdic['user']['dataPath'] = tpat.groups()[0]
                         print('infer data path: {}'.format(self.setdic['user']['dataPath']))
+        elif self.args.location == 'wasabi':
+            url_file = '{}/{}.wasabi.transfer.URL'.format(logs_path, user_folder)
+            # check file existence
+            if os.path.exists(url_file):
+                with open(url_file, 'r') as furl:
+                    tpat = search('^URL:\s*(.*)',furl.readline().strip())
+                    if tpat:
+                        self.setdic['user']['dataPath'] = tpat.groups()[0]
+                        print('infer data path: {}'.format(self.setdic['user']['dataPath']))
         elif self.args.location == 'sftp':
             url_file = '{}/{}.sftp.path'.format(logs_path, user_folder)
             # check file existence
@@ -388,6 +397,26 @@ class MyEmail:
     <p>Hi {},</p>
     <p>Your {} sequencing run ({} samples, iLab request: {}) is complete.
        The data can be downloaded via the following AWS s3 URL:</p>
+    <p style="color:blue;font-size:18px;"><b>{}</b></p>
+    <p>You can either download the data with a regular web browser by clicking the above link 
+       or through a Linux terminal with a command like this one: </p>
+    <p>wget -O YOU-PREFERED-FILE-NAME.tar  “THE-ABOVE-URL"</p>
+    <p><b>The data will be available for 7 days only, after that they will be removed. Please download your data on time.</b></p>
+    {}
+    <p>The run summary was attached. Please let us know if there are any problems.</p>
+    <p>Best,</p>
+    <p>{}</p>
+  </body>
+</html>
+""".format(username,instrument,nsamples,ilab,dataloc,mynote,sender)
+        elif self.args.location == 'wasabi':
+            self.main_text = """\
+<html>
+  <head></head>
+  <body>
+    <p>Hi {},</p>
+    <p>Your {} sequencing run ({} samples, iLab request: {}) is complete.
+       The data can be downloaded via the following WASABI s3 URL:</p>
     <p style="color:blue;font-size:18px;"><b>{}</b></p>
     <p>You can either download the data with a regular web browser by clicking the above link 
        or through a Linux terminal with a command like this one: </p>
@@ -516,7 +545,7 @@ def get_arguments():
     """fetch commandline arguments."""
     parser = ArgumentParser(description="""Send a notification email to user""", formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-s', '--setting', required=True, help="""a yaml file specifying detailed information.""")
-    parser.add_argument('-l', '--location', choices=['sftp','aws'], default='sftp', help="""data location either sftp or aws.""")
+    parser.add_argument('-l', '--location', choices=['sftp','aws','wasabi'], default='sftp', help="""data location either sftp or aws.""")
     parser.add_argument('-b', '--library', help="""library type.""")
     parser.add_argument('-f', '--fastq', help="""absolute path to the fastq files, do not put '/' at the end!!!""")
     parser.add_argument('-w', '--overwrite', action='store_true', help="""allow overwriting setting file.""")
